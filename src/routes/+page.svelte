@@ -33,6 +33,8 @@
 	let viewerContainer: HTMLDivElement | undefined;
 	let clipViewport: HTMLDivElement | undefined;
 
+	let activePointers = new Map<number, PointerEvent>();
+	let isPinching = $state(false);
 	let initialPinchDistance = 0;
 	let initialZoomLevel = 1;
 
@@ -40,24 +42,42 @@
 		zoomLevel = Math.max(0.1, Math.min(10, zoomLevel + amount));
 	}
 
-	function onTouchStart(e: TouchEvent) {
-		if (e.touches.length === 2) {
+	function onPointerDown(e: PointerEvent) {
+		activePointers.set(e.pointerId, e);
+		if (activePointers.size === 2) {
+			isPinching = true;
+			const pointers = Array.from(activePointers.values());
 			initialPinchDistance = Math.hypot(
-				e.touches[0].clientX - e.touches[1].clientX,
-				e.touches[0].clientY - e.touches[1].clientY
+				pointers[0].clientX - pointers[1].clientX,
+				pointers[0].clientY - pointers[1].clientY
 			);
 			initialZoomLevel = zoomLevel;
 		}
 	}
 
-	function onTouchMove(e: TouchEvent) {
-		if (e.touches.length === 2) {
+	function onPointerMove(e: PointerEvent) {
+		if (activePointers.has(e.pointerId)) {
+			activePointers.set(e.pointerId, e);
+		}
+		
+		if (activePointers.size === 2 && isPinching) {
+			const pointers = Array.from(activePointers.values());
 			const currentDistance = Math.hypot(
-				e.touches[0].clientX - e.touches[1].clientX,
-				e.touches[0].clientY - e.touches[1].clientY
+				pointers[0].clientX - pointers[1].clientX,
+				pointers[0].clientY - pointers[1].clientY
 			);
-			const scale = currentDistance / initialPinchDistance;
-			zoomLevel = Math.max(0.1, Math.min(10, initialZoomLevel * scale));
+			if (initialPinchDistance > 0) {
+				const scale = currentDistance / initialPinchDistance;
+				zoomLevel = Math.max(0.1, Math.min(10, initialZoomLevel * scale));
+			}
+		}
+	}
+
+	function onPointerUp(e: PointerEvent) {
+		activePointers.delete(e.pointerId);
+		if (activePointers.size < 2) {
+			isPinching = false;
+			initialPinchDistance = 0;
 		}
 	}
 
@@ -377,7 +397,7 @@
 					</div>
 				</div>
 
-				<div class="relative w-full h-[60vh] min-h-[400px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-inner flex flex-col" bind:this={viewerContainer} ontouchstart={onTouchStart} ontouchmove={onTouchMove}>
+				<div class="relative w-full h-[60vh] min-h-[400px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-inner flex flex-col" bind:this={viewerContainer} onpointerdown={onPointerDown} onpointermove={onPointerMove} onpointerup={onPointerUp} onpointercancel={onPointerUp}>
 					
 					<!-- Top Status Labels -->
 					{#if optimizedSvg}
@@ -410,7 +430,7 @@
 					<div class="flex-1 relative touch-pan-x touch-pan-y bg-gray-50">
 						{#if !optimizedSvg}
 							<div class="absolute inset-0 overflow-auto">
-								<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center pointer-events-none p-4 mx-auto">
+								<div style="width: {zoomLevel * 100}%; min-width: 100%; {isPinching ? '' : 'transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="relative min-h-full flex items-center justify-center pointer-events-none p-4 mx-auto">
 									<div class="w-full pointer-events-auto">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html originalSvg}
@@ -421,7 +441,7 @@
 							<!-- Comparison Wrapper -->
 							<!-- Base Layer (Optimized) -->
 							<div class="absolute inset-0 overflow-auto" onscroll={handleBaseScroll}>
-								<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
+								<div style="width: {zoomLevel * 100}%; min-width: 100%; {isPinching ? '' : 'transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
 									<div class="w-full">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html optimizedSvg}
@@ -431,7 +451,7 @@
 
 							<!-- Clipped Layer (Raw) -->
 							<div class="absolute inset-0 overflow-auto pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:this={clipViewport}>
-								<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
+								<div style="width: {zoomLevel * 100}%; min-width: 100%; {isPinching ? '' : 'transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
 									<div class="w-full">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html originalSvg}
