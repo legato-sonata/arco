@@ -5,6 +5,7 @@
 	let fileInput: HTMLInputElement;
 	let isDragging = $state(false);
 	let isConverting = $state(false);
+	let isOptimizing = $state(false);
 
 	let selectedFile: File | null = $state(null);
 	let rasterDataUrl: string | null = $state(null);
@@ -21,10 +22,14 @@
 	let qtres = $state(1);
 	let pathomit = $state(8);
 
+	// Zoom
+	let rawZoom = $state(1);
+	let optZoom = $state(1);
+
 	function formatBytes(bytes: number) {
-		if (bytes === 0) return '0 Bytes';
+		if (bytes === 0) return '0 B';
 		const k = 1024;
-		const sizes = ['Bytes', 'KB', 'MB'];
+		const sizes = ['B', 'KB', 'MB'];
 		const i = Math.floor(Math.log(bytes) / Math.log(k));
 		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 	}
@@ -53,6 +58,8 @@
 		originalSize = file.size;
 		originalSvg = null;
 		optimizedSvg = null;
+		rawZoom = 1;
+		optZoom = 1;
 
 		const reader = new FileReader();
 		reader.onload = (e) => {
@@ -61,11 +68,13 @@
 		reader.readAsDataURL(file);
 	}
 
-	async function convert() {
+	async function trace() {
 		if (!rasterDataUrl) return;
 		isConverting = true;
+		optimizedSvg = null; // reset optimization if we re-trace
+		optZoom = 1;
+		rawZoom = 1;
 
-		// Small delay to allow UI to update
 		await new Promise(r => setTimeout(r, 50));
 
 		try {
@@ -90,32 +99,46 @@
 
 			if (originalSvg) {
 				svgSize = new Blob([originalSvg]).size;
-
-				const result = optimize(originalSvg, {
-					multipass: true,
-					floatPrecision: 1,
-					plugins: [
-						{
-							name: 'preset-default',
-							params: {
-								overrides: {
-									cleanupNumericValues: { floatPrecision: 1 },
-									convertPathData: { floatPrecision: 1, forceAbsolutePath: false, utilzeAbsolute: false },
-									removeViewBox: false
-								}
-							}
-						}
-					]
-				});
-
-				optimizedSvg = result.data;
-				optimizedSize = new Blob([optimizedSvg]).size;
 			}
 		} catch (error) {
-			console.error("Conversion error:", error);
-			alert("An error occurred during conversion.");
+			console.error("Tracing error:", error);
+			alert("An error occurred during tracing.");
 		} finally {
 			isConverting = false;
+		}
+	}
+
+	async function optimizeSvg() {
+		if (!originalSvg) return;
+		isOptimizing = true;
+
+		await new Promise(r => setTimeout(r, 50));
+
+		try {
+			const result = optimize(originalSvg, {
+				multipass: true,
+				floatPrecision: 1,
+				plugins: [
+					{
+						name: 'preset-default',
+						params: {
+							overrides: {
+								cleanupNumericValues: { floatPrecision: 1 },
+								convertPathData: { floatPrecision: 1, forceAbsolutePath: false, utilzeAbsolute: false },
+								removeViewBox: false
+							}
+						}
+					}
+				]
+			});
+
+			optimizedSvg = result.data;
+			optimizedSize = new Blob([optimizedSvg]).size;
+		} catch (error) {
+			console.error("Optimization error:", error);
+			alert("An error occurred during optimization.");
+		} finally {
+			isOptimizing = false;
 		}
 	}
 
@@ -132,23 +155,24 @@
 	}
 </script>
 
-<div class="min-h-screen bg-neutral-900 text-neutral-100 font-sans selection:bg-indigo-500/30 p-8">
-	<div class="max-w-5xl mx-auto space-y-8">
-		<header class="text-center space-y-4">
-			<h1 class="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent inline-block">
-				Arco
-			</h1>
-			<p class="text-neutral-400 text-lg max-w-xl mx-auto">
-				Transform your raster line art into clean, ultra-optimized SVGs directly in your browser.
+<div class="min-h-screen bg-white text-black font-sans selection:bg-gray-200">
+	<div class="max-w-4xl mx-auto px-4 py-8 md:py-16 space-y-12">
+		<!-- Header -->
+		<header class="text-center space-y-3">
+			<h1 class="text-4xl md:text-5xl font-bold tracking-tight text-black">Arco</h1>
+			<p class="text-gray-500 text-base md:text-lg max-w-xl mx-auto">
+				Convert raster line art to SVG, then optimize.
 			</p>
 		</header>
 
-		<main class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-			<div class="lg:col-span-4 space-y-6">
+		<main class="space-y-12">
+			
+			<!-- Upload Zone -->
+			<section aria-label="Upload Image">
 				<div 
 					role="button"
 					tabindex="0"
-					class="relative overflow-hidden rounded-2xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center p-8 text-center cursor-pointer min-h-[240px] {isDragging ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 hover:border-neutral-500 hover:bg-neutral-800/50'}"
+					class="relative overflow-hidden rounded-2xl transition-all duration-300 flex flex-col items-center justify-center p-8 md:p-12 text-center cursor-pointer min-h-[200px] border-2 {isDragging ? 'border-black bg-gray-50' : 'border-dashed border-gray-300 hover:border-gray-500 hover:bg-gray-50'}"
 					ondragover={(e) => { e.preventDefault(); isDragging = true; }}
 					ondragleave={() => { isDragging = false; }}
 					ondrop={handleDrop}
@@ -161,137 +185,174 @@
 						class="hidden" 
 						bind:this={fileInput}
 						onchange={handleFileInput}
+						aria-label="File upload"
 					>
-					<div class="space-y-4 pointer-events-none">
-						<div class="w-16 h-16 mx-auto rounded-full bg-neutral-800 flex items-center justify-center text-indigo-400">
-							<svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<div class="space-y-3 pointer-events-none">
+						<div class="w-12 h-12 mx-auto rounded-full bg-gray-100 flex items-center justify-center text-black">
+							<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
 							</svg>
 						</div>
 						<div>
-							<p class="font-medium text-neutral-200">Click or drag image to upload</p>
-							<p class="text-sm text-neutral-500 mt-1">PNG or JPG (Line art recommended)</p>
+							<p class="font-medium text-black">Tap to upload or drag and drop</p>
+							<p class="text-sm text-gray-500 mt-1">PNG or JPG (Line art)</p>
 						</div>
 					</div>
 				</div>
+			</section>
 
-				<div class="bg-neutral-800/50 backdrop-blur-sm rounded-2xl p-6 border border-neutral-700/50 space-y-6">
-					<h3 class="font-semibold text-lg flex items-center gap-2">
-						<svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-						</svg>
-						Tracing Options
-					</h3>
+			{#if rasterDataUrl}
+			<!-- Source Preview and Options -->
+			<section class="grid grid-cols-1 md:grid-cols-2 gap-8" aria-label="Tracing options and preview">
+				<div class="space-y-6">
+					<div>
+						<h2 class="text-lg font-semibold border-b border-gray-100 pb-2 mb-4">Original Image</h2>
+						<div class="bg-gray-50 rounded-xl p-4 flex items-center justify-center min-h-[200px] border border-gray-100">
+							<img src={rasterDataUrl} alt="Source Preview" class="max-w-full max-h-[300px] object-contain shadow-sm" />
+						</div>
+						<div class="text-sm text-gray-500 mt-2 text-right">Size: {formatBytes(originalSize)}</div>
+					</div>
+				</div>
+
+				<div class="space-y-6">
+					<h2 class="text-lg font-semibold border-b border-gray-100 pb-2">Tracing Options</h2>
 					
-					<div class="space-y-4">
-						<div class="space-y-2">
+					<div class="space-y-5">
+						<div class="space-y-1.5">
 							<div class="flex justify-between text-sm">
-								<label for="ltres" class="text-neutral-400">Line Threshold</label>
-								<span class="text-neutral-200 font-mono">{ltres}</span>
+								<label for="ltres" class="text-gray-700 font-medium">Line Threshold</label>
+								<span class="text-gray-500">{ltres}</span>
 							</div>
-							<input id="ltres" type="range" min="0.1" max="5" step="0.1" bind:value={ltres} class="w-full accent-indigo-500" />
+							<input id="ltres" type="range" min="0.1" max="5" step="0.1" bind:value={ltres} class="w-full accent-black" />
 						</div>
 						
-						<div class="space-y-2">
+						<div class="space-y-1.5">
 							<div class="flex justify-between text-sm">
-								<label for="qtres" class="text-neutral-400">Quadratic Spline Threshold</label>
-								<span class="text-neutral-200 font-mono">{qtres}</span>
+								<label for="qtres" class="text-gray-700 font-medium">Quadratic Threshold</label>
+								<span class="text-gray-500">{qtres}</span>
 							</div>
-							<input id="qtres" type="range" min="0.1" max="5" step="0.1" bind:value={qtres} class="w-full accent-purple-500" />
+							<input id="qtres" type="range" min="0.1" max="5" step="0.1" bind:value={qtres} class="w-full accent-black" />
 						</div>
 
-						<div class="space-y-2">
+						<div class="space-y-1.5">
 							<div class="flex justify-between text-sm">
-								<label for="pathomit" class="text-neutral-400">Path Omit (Noise Filter)</label>
-								<span class="text-neutral-200 font-mono">{pathomit}</span>
+								<label for="pathomit" class="text-gray-700 font-medium">Noise Filter (Path Omit)</label>
+								<span class="text-gray-500">{pathomit}</span>
 							</div>
-							<input id="pathomit" type="range" min="0" max="64" step="1" bind:value={pathomit} class="w-full accent-pink-500" />
+							<input id="pathomit" type="range" min="0" max="64" step="1" bind:value={pathomit} class="w-full accent-black" />
 						</div>
 					</div>
 
 					<button 
-						onclick={convert}
-						disabled={!rasterDataUrl || isConverting}
-						class="w-full py-3 px-4 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium text-white shadow-lg shadow-indigo-500/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+						onclick={trace}
+						disabled={isConverting}
+						class="w-full py-3.5 px-4 bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium text-white transition-colors flex items-center justify-center gap-2 shadow-sm"
 					>
 						{#if isConverting}
 							<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 							</svg>
-							Converting...
+							Tracing...
 						{:else}
-							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-							</svg>
-							Vectorize & Optimize
+							Generate SVG
 						{/if}
 					</button>
 				</div>
-			</div>
+			</section>
+			{/if}
 
-			<div class="lg:col-span-8 grid grid-rows-2 gap-6 min-h-[600px]">
-				<div class="bg-neutral-800/30 rounded-2xl border border-neutral-700/50 flex flex-col overflow-hidden relative">
-					<div class="p-4 border-b border-neutral-700/50 flex justify-between items-center bg-neutral-800/80">
-						<h3 class="font-medium text-neutral-300">Original Source</h3>
-						{#if rasterDataUrl}
-							<span class="text-xs px-2.5 py-1 bg-neutral-700 rounded-full text-neutral-300 font-mono">
-								{formatBytes(originalSize)}
-							</span>
-						{/if}
+			{#if originalSvg}
+			<!-- Raw SVG Result -->
+			<section class="space-y-4" aria-label="Raw SVG Result">
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+					<div>
+						<h2 class="text-xl font-bold">Traced SVG Result</h2>
+						<p class="text-sm text-gray-500">File size: {formatBytes(svgSize)}</p>
 					</div>
-					<div class="flex-1 p-6 flex items-center justify-center bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0iIzIyMiIvPgo8cmVjdCB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiMzMzMiLz4KPHJlY3QgeD0iMTAiIHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiMzMzMiLz4KPC9zdmc+')]">
-						{#if rasterDataUrl}
-							<img src={rasterDataUrl} alt="Source" class="max-w-full max-h-[300px] object-contain drop-shadow-2xl" />
-						{:else}
-							<span class="text-neutral-600">No image selected</span>
-						{/if}
+					
+					<div class="flex items-center gap-4 w-full sm:w-auto">
+						<div class="flex items-center gap-2 flex-1 sm:flex-none">
+							<span class="text-xs text-gray-500">Zoom</span>
+							<input type="range" min="0.1" max="3" step="0.1" bind:value={rawZoom} class="w-24 accent-black" aria-label="Zoom raw SVG" />
+							<span class="text-xs text-gray-500 w-8">{Math.round(rawZoom * 100)}%</span>
+						</div>
+						<button 
+							onclick={() => download(originalSvg as string, 'arco-traced.svg')}
+							class="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors text-black"
+						>
+							Download
+						</button>
 					</div>
 				</div>
 
-				<div class="bg-neutral-800/30 rounded-2xl border border-neutral-700/50 flex flex-col overflow-hidden relative">
-					<div class="p-4 border-b border-neutral-700/50 flex justify-between items-center bg-neutral-800/80">
-						<h3 class="font-medium flex items-center gap-2">
-							<span class="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">Optimized SVG</span>
-						</h3>
-						{#if optimizedSvg}
-							<div class="flex items-center gap-3">
-								<div class="flex flex-col items-end mr-4">
-									<span class="text-xs text-neutral-400">Raw: {formatBytes(svgSize)}</span>
-									<span class="text-sm font-medium text-emerald-400">Opt: {formatBytes(optimizedSize)}</span>
-								</div>
-								<button 
-									onclick={() => download(optimizedSvg as string, 'arco-optimized.svg')}
-									class="px-4 py-1.5 bg-neutral-700 hover:bg-neutral-600 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 text-white"
-								>
-									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-									</svg>
-									Download
-								</button>
-							</div>
-						{/if}
-					</div>
-					<div class="flex-1 p-6 flex items-center justify-center bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0iIzIyMiIvPgo8cmVjdCB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiMzMzMiLz4KPHJlY3QgeD0iMTAiIHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiMzMzMiLz4KPC9zdmc+')] relative overflow-hidden group">
-						{#if optimizedSvg}
-							<div class="w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:w-auto [&>svg]:h-auto drop-shadow-2xl">
-								<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-								{@html optimizedSvg}
-							</div>
-						{:else if isConverting}
-							<div class="absolute inset-0 flex flex-col items-center justify-center bg-neutral-900/50 backdrop-blur-sm z-10 text-indigo-400 space-y-4">
-								<svg class="animate-spin h-10 w-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-								</svg>
-								<span class="font-medium animate-pulse">Processing vector math...</span>
-							</div>
-						{:else}
-							<span class="text-neutral-600">Output will appear here</span>
-						{/if}
+				<div class="bg-gray-50 rounded-2xl overflow-auto border border-gray-100 h-[400px] p-4 flex items-center justify-center">
+					<div class="origin-center transition-transform duration-200 min-w-full min-h-full flex items-center justify-center" style="transform: scale({rawZoom})">
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						{@html originalSvg}
 					</div>
 				</div>
-			</div>
+
+				<!-- Optimization Prompt -->
+				{#if !optimizedSvg}
+				<div class="pt-6 flex flex-col items-center text-center space-y-4">
+					<p class="text-gray-600">Want a smaller file size with cleaner paths?</p>
+					<button 
+						onclick={optimizeSvg}
+						disabled={isOptimizing}
+						class="py-3 px-6 bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium text-white transition-colors shadow-sm inline-flex items-center gap-2"
+					>
+						{#if isOptimizing}
+							<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+							Optimizing...
+						{:else}
+							Optimize with SVGO
+						{/if}
+					</button>
+				</div>
+				{/if}
+			</section>
+			{/if}
+
+			{#if optimizedSvg}
+			<!-- Optimized SVG Result -->
+			<section class="space-y-4 pt-8 border-t border-gray-100" aria-label="Optimized SVG Result">
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+					<div>
+						<h2 class="text-xl font-bold flex items-center gap-2">
+							Optimized SVG
+							<span class="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded-full font-medium">Reduced by {Math.round((1 - optimizedSize/svgSize)*100)}%</span>
+						</h2>
+						<p class="text-sm text-gray-500">File size: {formatBytes(optimizedSize)} (was {formatBytes(svgSize)})</p>
+					</div>
+					
+					<div class="flex items-center gap-4 w-full sm:w-auto">
+						<div class="flex items-center gap-2 flex-1 sm:flex-none">
+							<span class="text-xs text-gray-500">Zoom</span>
+							<input type="range" min="0.1" max="3" step="0.1" bind:value={optZoom} class="w-24 accent-black" aria-label="Zoom optimized SVG" />
+							<span class="text-xs text-gray-500 w-8">{Math.round(optZoom * 100)}%</span>
+						</div>
+						<button 
+							onclick={() => download(optimizedSvg as string, 'arco-optimized.svg')}
+							class="px-4 py-2 bg-black hover:bg-gray-800 text-sm font-medium rounded-lg transition-colors text-white shadow-sm"
+						>
+							Download
+						</button>
+					</div>
+				</div>
+
+				<div class="bg-gray-50 rounded-2xl overflow-auto border border-gray-100 h-[400px] p-4 flex items-center justify-center">
+					<div class="origin-center transition-transform duration-200 min-w-full min-h-full flex items-center justify-center" style="transform: scale({optZoom})">
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						{@html optimizedSvg}
+					</div>
+				</div>
+			</section>
+			{/if}
+
 		</main>
 	</div>
 </div>
