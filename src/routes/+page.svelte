@@ -30,7 +30,8 @@
 	let scrollY = $state(0);
 
 	let isDraggingSplit = $state(false);
-	let viewerContainer: HTMLDivElement;
+	let viewerContainer: HTMLDivElement | undefined;
+	let clipViewport: HTMLDivElement | undefined;
 
 	let initialPinchDistance = 0;
 	let initialZoomLevel = 1;
@@ -75,6 +76,13 @@
 	function onPointerUpSplit(e: PointerEvent) {
 		isDraggingSplit = false;
 		e.target?.releasePointerCapture(e.pointerId);
+	}
+
+	function handleBaseScroll(e: Event) {
+		if (!clipViewport) return;
+		const target = e.target as HTMLDivElement;
+		clipViewport.scrollTop = target.scrollTop;
+		clipViewport.scrollLeft = target.scrollLeft;
 	}
 
 	function fixSvgForZoom(svgStr: string) {
@@ -401,7 +409,7 @@
 					<!-- Viewport -->
 					<div class="flex-1 relative touch-pan-x touch-pan-y bg-gray-50">
 						{#if !optimizedSvg}
-							<div class="absolute inset-0 overflow-auto" bind:scrollLeft={scrollX} bind:scrollTop={scrollY}>
+							<div class="absolute inset-0 overflow-auto">
 								<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center pointer-events-none p-4 mx-auto">
 									<div class="w-full pointer-events-auto">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -412,7 +420,7 @@
 						{:else}
 							<!-- Comparison Wrapper -->
 							<!-- Base Layer (Optimized) -->
-							<div class="absolute inset-0 overflow-auto" bind:scrollLeft={scrollX} bind:scrollTop={scrollY}>
+							<div class="absolute inset-0 overflow-auto" onscroll={handleBaseScroll}>
 								<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
 									<div class="w-full">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -422,7 +430,7 @@
 							</div>
 
 							<!-- Clipped Layer (Raw) -->
-							<div class="absolute inset-0 overflow-auto pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:scrollLeft={scrollX} bind:scrollTop={scrollY}>
+							<div class="absolute inset-0 overflow-auto pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:this={clipViewport}>
 								<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
 									<div class="w-full">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
