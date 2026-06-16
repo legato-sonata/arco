@@ -26,6 +26,18 @@
 	let rawZoom = $state(1);
 	let optZoom = $state(1);
 
+	function fixSvgForZoom(svgStr: string) {
+		let fixed = svgStr;
+		const match = fixed.match(/<svg[^>]*width="([^"]+)"[^>]*height="([^"]+)"/);
+		if (match && !fixed.includes('viewBox=')) {
+			fixed = fixed.replace('<svg ', `<svg viewBox="0 0 ${match[1]} ${match[2]}" `);
+		}
+		fixed = fixed.replace(/(<svg[^>]*)width="[^"]+"/, '$1');
+		fixed = fixed.replace(/(<svg[^>]*)height="[^"]+"/, '$1');
+		fixed = fixed.replace('<svg ', '<svg width="100%" height="100%" ');
+		return fixed;
+	}
+
 	function formatBytes(bytes: number) {
 		if (bytes === 0) return '0 B';
 		const k = 1024;
@@ -78,7 +90,7 @@
 		await new Promise(r => setTimeout(r, 50));
 
 		try {
-			originalSvg = await new Promise((resolve) => {
+			let rawSvg = await new Promise<string>((resolve) => {
 				ImageTracer.imageToSVG(
 					rasterDataUrl,
 					(svgstr: string) => resolve(svgstr),
@@ -97,7 +109,8 @@
 				);
 			});
 
-			if (originalSvg) {
+			if (rawSvg) {
+				originalSvg = fixSvgForZoom(rawSvg);
 				svgSize = new Blob([originalSvg]).size;
 			}
 		} catch (error) {
@@ -132,7 +145,7 @@
 				]
 			});
 
-			optimizedSvg = result.data;
+			optimizedSvg = fixSvgForZoom(result.data);
 			optimizedSize = new Blob([optimizedSvg]).size;
 		} catch (error) {
 			console.error("Optimization error:", error);
@@ -286,8 +299,8 @@
 					</div>
 				</div>
 
-				<div class="bg-gray-50 rounded-2xl overflow-auto border border-gray-100 h-[400px] p-4 flex items-center justify-center">
-					<div class="origin-center transition-transform duration-200 min-w-full min-h-full flex items-center justify-center" style="transform: scale({rawZoom})">
+				<div class="bg-gray-50 rounded-2xl overflow-auto border border-gray-100 h-[400px] w-full relative">
+					<div style="width: {rawZoom * 100}%; min-width: 100%; transition: width 0.2s ease-out;" class="flex items-center justify-center p-4 mx-auto">
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 						{@html originalSvg}
 					</div>
@@ -344,8 +357,8 @@
 					</div>
 				</div>
 
-				<div class="bg-gray-50 rounded-2xl overflow-auto border border-gray-100 h-[400px] p-4 flex items-center justify-center">
-					<div class="origin-center transition-transform duration-200 min-w-full min-h-full flex items-center justify-center" style="transform: scale({optZoom})">
+				<div class="bg-gray-50 rounded-2xl overflow-auto border border-gray-100 h-[400px] w-full relative">
+					<div style="width: {optZoom * 100}%; min-width: 100%; transition: width 0.2s ease-out;" class="flex items-center justify-center p-4 mx-auto">
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 						{@html optimizedSvg}
 					</div>
