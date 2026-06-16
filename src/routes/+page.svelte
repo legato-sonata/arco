@@ -25,9 +25,56 @@
 	// Unified Viewer State
 	let zoomLevel = $state(1);
 	let splitPos = $state(50);
+	
+	let scrollX = $state(0);
+	let scrollY = $state(0);
+
+	let isDraggingSplit = $state(false);
+	let viewerContainer: HTMLDivElement;
+
+	let initialPinchDistance = 0;
+	let initialZoomLevel = 1;
 
 	function handleZoom(amount: number) {
 		zoomLevel = Math.max(0.1, Math.min(10, zoomLevel + amount));
+	}
+
+	function onTouchStart(e: TouchEvent) {
+		if (e.touches.length === 2) {
+			initialPinchDistance = Math.hypot(
+				e.touches[0].clientX - e.touches[1].clientX,
+				e.touches[0].clientY - e.touches[1].clientY
+			);
+			initialZoomLevel = zoomLevel;
+		}
+	}
+
+	function onTouchMove(e: TouchEvent) {
+		if (e.touches.length === 2) {
+			const currentDistance = Math.hypot(
+				e.touches[0].clientX - e.touches[1].clientX,
+				e.touches[0].clientY - e.touches[1].clientY
+			);
+			const scale = currentDistance / initialPinchDistance;
+			zoomLevel = Math.max(0.1, Math.min(10, initialZoomLevel * scale));
+		}
+	}
+
+	function onPointerDownSplit(e: PointerEvent) {
+		isDraggingSplit = true;
+		e.target?.setPointerCapture(e.pointerId);
+	}
+
+	function onPointerMoveSplit(e: PointerEvent) {
+		if (!isDraggingSplit || !viewerContainer) return;
+		const rect = viewerContainer.getBoundingClientRect();
+		let newPos = ((e.clientX - rect.left) / rect.width) * 100;
+		splitPos = Math.max(0, Math.min(100, newPos));
+	}
+
+	function onPointerUpSplit(e: PointerEvent) {
+		isDraggingSplit = false;
+		e.target?.releasePointerCapture(e.pointerId);
 	}
 
 	function fixSvgForZoom(svgStr: string) {
@@ -322,7 +369,7 @@
 					</div>
 				</div>
 
-				<div class="relative w-full h-[60vh] min-h-[400px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-inner flex flex-col">
+				<div class="relative w-full h-[60vh] min-h-[400px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-inner flex flex-col" bind:this={viewerContainer} ontouchstart={onTouchStart} ontouchmove={onTouchMove}>
 					
 					<!-- Top Status Labels -->
 					{#if optimizedSvg}
@@ -352,54 +399,54 @@
 					</div>
 
 					<!-- Viewport -->
-					<div class="flex-1 overflow-auto relative touch-pan-x touch-pan-y">
-						<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center pointer-events-none p-4 mx-auto">
-							
-							{#if !optimizedSvg}
-								<div class="w-full pointer-events-auto">
-									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-									{@html originalSvg}
+					<div class="flex-1 relative touch-pan-x touch-pan-y bg-gray-50">
+						{#if !optimizedSvg}
+							<div class="absolute inset-0 overflow-auto" bind:scrollLeft={scrollX} bind:scrollTop={scrollY}>
+								<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center pointer-events-none p-4 mx-auto">
+									<div class="w-full pointer-events-auto">
+										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+										{@html originalSvg}
+									</div>
 								</div>
-							{:else}
-								<!-- Comparison Wrapper -->
-								<div class="relative w-full flex items-center justify-center select-none group pointer-events-auto">
-									<!-- After Layer (Optimized) - Full Width underneath -->
+							</div>
+						{:else}
+							<!-- Comparison Wrapper -->
+							<!-- Base Layer (Optimized) -->
+							<div class="absolute inset-0 overflow-auto" bind:scrollLeft={scrollX} bind:scrollTop={scrollY}>
+								<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
 									<div class="w-full">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html optimizedSvg}
 									</div>
-
-									<!-- Before Layer (Raw) - Clipped via CSS -->
-									<div class="absolute inset-0 flex items-center justify-center" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);">
-										<div class="w-full">
-											<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-											{@html originalSvg}
-										</div>
-									</div>
-
-									<!-- Split Divider Line -->
-									<div class="absolute inset-y-0 w-0.5 bg-black z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)] pointer-events-none" style="left: {splitPos}%;">
-										<!-- Dragger Handle -->
-										<div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 bg-white border-2 border-black rounded-full flex items-center justify-center shadow-lg transition-transform group-active:scale-95">
-											<svg class="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" transform="rotate(90 12 12)" />
-											</svg>
-										</div>
-									</div>
-
-									<!-- Invisible interactive slider overlay -->
-									<input 
-										type="range" 
-										min="0" 
-										max="100" 
-										bind:value={splitPos} 
-										class="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-20" 
-										aria-label="Comparison slider" 
-									/>
 								</div>
-							{/if}
+							</div>
 
-						</div>
+							<!-- Clipped Layer (Raw) -->
+							<div class="absolute inset-0 overflow-auto pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:scrollLeft={scrollX} bind:scrollTop={scrollY}>
+								<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
+									<div class="w-full">
+										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+										{@html originalSvg}
+									</div>
+								</div>
+							</div>
+
+							<!-- Custom Draggable Split Line -->
+							<div class="absolute inset-y-0 w-1 bg-black z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)] touch-none select-none hover:bg-gray-800" 
+								style="left: {splitPos}%; transform: translateX(-50%); cursor: ew-resize;"
+								onpointerdown={onPointerDownSplit}
+								onpointermove={onPointerMoveSplit}
+								onpointerup={onPointerUpSplit}
+								onpointercancel={onPointerUpSplit}
+							>
+								<!-- Dragger Handle -->
+								<div class="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 w-10 h-10 bg-white border-2 border-black rounded-full flex items-center justify-center shadow-lg transition-transform {isDraggingSplit ? 'scale-95 bg-gray-50' : ''}">
+									<svg class="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" transform="rotate(90 12 12)" />
+									</svg>
+								</div>
+							</div>
+						{/if}
 					</div>
 				</div>
 
