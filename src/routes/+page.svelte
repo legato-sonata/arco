@@ -22,9 +22,13 @@
 	let qtres = $state(1);
 	let pathomit = $state(8);
 
-	// Zoom
-	let rawZoom = $state(1);
-	let optZoom = $state(1);
+	// Unified Viewer State
+	let zoomLevel = $state(1);
+	let splitPos = $state(50);
+
+	function handleZoom(amount: number) {
+		zoomLevel = Math.max(0.1, Math.min(10, zoomLevel + amount));
+	}
 
 	function fixSvgForZoom(svgStr: string) {
 		let fixed = svgStr;
@@ -34,7 +38,7 @@
 		}
 		fixed = fixed.replace(/(<svg[^>]*)width="[^"]+"/, '$1');
 		fixed = fixed.replace(/(<svg[^>]*)height="[^"]+"/, '$1');
-		fixed = fixed.replace('<svg ', '<svg width="100%" height="100%" ');
+		fixed = fixed.replace('<svg ', '<svg width="100%" height="100%" style="display:block;max-width:100%;max-height:100%" ');
 		return fixed;
 	}
 
@@ -70,8 +74,8 @@
 		originalSize = file.size;
 		originalSvg = null;
 		optimizedSvg = null;
-		rawZoom = 1;
-		optZoom = 1;
+		zoomLevel = 1;
+		splitPos = 50;
 
 		const reader = new FileReader();
 		reader.onload = (e) => {
@@ -84,8 +88,8 @@
 		if (!rasterDataUrl) return;
 		isConverting = true;
 		optimizedSvg = null; // reset optimization if we re-trace
-		optZoom = 1;
-		rawZoom = 1;
+		zoomLevel = 1;
+		splitPos = 50;
 
 		await new Promise(r => setTimeout(r, 50));
 
@@ -216,7 +220,7 @@
 
 			{#if rasterDataUrl}
 			<!-- Source Preview and Options -->
-			<section class="grid grid-cols-1 md:grid-cols-2 gap-8" aria-label="Tracing options and preview">
+			<section class="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500" aria-label="Tracing options and preview">
 				<div class="space-y-6">
 					<div>
 						<h2 class="text-lg font-semibold border-b border-gray-100 pb-2 mb-4">Original Image</h2>
@@ -230,27 +234,36 @@
 				<div class="space-y-6">
 					<h2 class="text-lg font-semibold border-b border-gray-100 pb-2">Tracing Options</h2>
 					
-					<div class="space-y-5">
-						<div class="space-y-1.5">
-							<div class="flex justify-between text-sm">
-								<label for="ltres" class="text-gray-700 font-medium">Line Threshold</label>
-								<span class="text-gray-500">{ltres}</span>
+					<div class="space-y-6">
+						<div class="space-y-2">
+							<div class="flex justify-between items-end">
+								<div>
+									<label for="ltres" class="text-gray-900 font-medium block">Detail Level</label>
+									<span class="text-xs text-gray-500 block max-w-[200px]">Lower = captures tiny details, Higher = ignores small squiggles</span>
+								</div>
+								<span class="text-gray-700 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{ltres}</span>
 							</div>
 							<input id="ltres" type="range" min="0.1" max="5" step="0.1" bind:value={ltres} class="w-full accent-black" />
 						</div>
 						
-						<div class="space-y-1.5">
-							<div class="flex justify-between text-sm">
-								<label for="qtres" class="text-gray-700 font-medium">Quadratic Threshold</label>
-								<span class="text-gray-500">{qtres}</span>
+						<div class="space-y-2">
+							<div class="flex justify-between items-end">
+								<div>
+									<label for="qtres" class="text-gray-900 font-medium block">Curve Smoothness</label>
+									<span class="text-xs text-gray-500 block max-w-[200px]">Lower = hugs original lines tightly, Higher = smoother curves</span>
+								</div>
+								<span class="text-gray-700 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{qtres}</span>
 							</div>
 							<input id="qtres" type="range" min="0.1" max="5" step="0.1" bind:value={qtres} class="w-full accent-black" />
 						</div>
 
-						<div class="space-y-1.5">
-							<div class="flex justify-between text-sm">
-								<label for="pathomit" class="text-gray-700 font-medium">Noise Filter (Path Omit)</label>
-								<span class="text-gray-500">{pathomit}</span>
+						<div class="space-y-2">
+							<div class="flex justify-between items-end">
+								<div>
+									<label for="pathomit" class="text-gray-900 font-medium block">Speckle Removal</label>
+									<span class="text-xs text-gray-500 block max-w-[200px]">Higher = removes stray dots and noise, Lower = keeps everything</span>
+								</div>
+								<span class="text-gray-700 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{pathomit}</span>
 							</div>
 							<input id="pathomit" type="range" min="0" max="64" step="1" bind:value={pathomit} class="w-full accent-black" />
 						</div>
@@ -268,7 +281,7 @@
 							</svg>
 							Tracing...
 						{:else}
-							Generate SVG
+							Generate Vector (SVG)
 						{/if}
 					</button>
 				</div>
@@ -276,93 +289,144 @@
 			{/if}
 
 			{#if originalSvg}
-			<!-- Raw SVG Result -->
-			<section class="space-y-4" aria-label="Raw SVG Result">
+			<!-- Unified Result Viewer -->
+			<section class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500" aria-label="Result Viewer">
+				
 				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
 					<div>
-						<h2 class="text-xl font-bold">Traced SVG Result</h2>
-						<p class="text-sm text-gray-500">File size: {formatBytes(svgSize)}</p>
+						<h2 class="text-xl font-bold flex items-center gap-2">
+							Vector Result
+							{#if optimizedSvg}
+								<span class="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded-full font-medium">
+									Optimized (Reduced by {Math.round((1 - optimizedSize/svgSize)*100)}%)
+								</span>
+							{/if}
+						</h2>
 					</div>
 					
-					<div class="flex items-center gap-4 w-full sm:w-auto">
-						<div class="flex items-center gap-2 flex-1 sm:flex-none">
-							<span class="text-xs text-gray-500">Zoom</span>
-							<input type="range" min="0.1" max="3" step="0.1" bind:value={rawZoom} class="w-24 accent-black" aria-label="Zoom raw SVG" />
-							<span class="text-xs text-gray-500 w-8">{Math.round(rawZoom * 100)}%</span>
-						</div>
+					<div class="flex flex-wrap items-center gap-3">
 						<button 
-							onclick={() => download(originalSvg as string, 'arco-traced.svg')}
+							onclick={() => download(originalSvg as string, 'arco-traced-raw.svg')}
 							class="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors text-black"
 						>
-							Download
+							Download Raw
 						</button>
+						{#if optimizedSvg}
+							<button 
+								onclick={() => download(optimizedSvg as string, 'arco-optimized.svg')}
+								class="px-4 py-2 bg-black hover:bg-gray-800 text-sm font-medium rounded-lg transition-colors text-white shadow-sm"
+							>
+								Download Optimized
+							</button>
+						{/if}
 					</div>
 				</div>
 
-				<div class="bg-gray-50 rounded-2xl overflow-auto border border-gray-100 h-[400px] w-full relative">
-					<div style="width: {rawZoom * 100}%; min-width: 100%; transition: width 0.2s ease-out;" class="flex items-center justify-center p-4 mx-auto">
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html originalSvg}
+				<div class="relative w-full h-[60vh] min-h-[400px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-inner flex flex-col">
+					
+					<!-- Top Status Labels -->
+					{#if optimizedSvg}
+						<div class="absolute top-4 left-4 z-20 flex gap-2">
+							<span class="bg-white/90 backdrop-blur text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm border border-gray-200 text-gray-600">
+								Raw ({formatBytes(svgSize)})
+							</span>
+						</div>
+						<div class="absolute top-4 right-4 z-20 flex gap-2">
+							<span class="bg-white/90 backdrop-blur text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm border border-gray-200 text-emerald-600">
+								Optimized ({formatBytes(optimizedSize)})
+							</span>
+						</div>
+					{/if}
+
+					<!-- Floating Direct Zoom Controls -->
+					<div class="absolute bottom-6 right-6 z-30 flex items-center bg-white/90 backdrop-blur rounded-xl shadow-lg border border-gray-200 p-1">
+						<button onclick={() => handleZoom(-0.2)} class="p-2.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-700" aria-label="Zoom out">
+							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+						</button>
+						<div class="flex items-center justify-center w-14 text-sm font-bold text-gray-800 select-none">
+							{Math.round(zoomLevel * 100)}%
+						</div>
+						<button onclick={() => handleZoom(0.2)} class="p-2.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-700" aria-label="Zoom in">
+							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+						</button>
+					</div>
+
+					<!-- Viewport -->
+					<div class="flex-1 overflow-auto relative touch-pan-x touch-pan-y">
+						<div style="width: {zoomLevel * 100}%; min-width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);" class="relative min-h-full flex items-center justify-center pointer-events-none p-4 mx-auto">
+							
+							{#if !optimizedSvg}
+								<div class="w-full pointer-events-auto">
+									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+									{@html originalSvg}
+								</div>
+							{:else}
+								<!-- Comparison Wrapper -->
+								<div class="relative w-full flex items-center justify-center select-none group pointer-events-auto">
+									<!-- After Layer (Optimized) - Full Width underneath -->
+									<div class="w-full">
+										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+										{@html optimizedSvg}
+									</div>
+
+									<!-- Before Layer (Raw) - Clipped via CSS -->
+									<div class="absolute inset-0 flex items-center justify-center" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);">
+										<div class="w-full">
+											<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+											{@html originalSvg}
+										</div>
+									</div>
+
+									<!-- Split Divider Line -->
+									<div class="absolute inset-y-0 w-0.5 bg-black z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)] pointer-events-none" style="left: {splitPos}%;">
+										<!-- Dragger Handle -->
+										<div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 bg-white border-2 border-black rounded-full flex items-center justify-center shadow-lg transition-transform group-active:scale-95">
+											<svg class="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" transform="rotate(90 12 12)" />
+											</svg>
+										</div>
+									</div>
+
+									<!-- Invisible interactive slider overlay -->
+									<input 
+										type="range" 
+										min="0" 
+										max="100" 
+										bind:value={splitPos} 
+										class="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-20" 
+										aria-label="Comparison slider" 
+									/>
+								</div>
+							{/if}
+
+						</div>
 					</div>
 				</div>
 
 				<!-- Optimization Prompt -->
 				{#if !optimizedSvg}
 				<div class="pt-6 flex flex-col items-center text-center space-y-4">
-					<p class="text-gray-600">Want a smaller file size with cleaner paths?</p>
-					<button 
-						onclick={optimizeSvg}
-						disabled={isOptimizing}
-						class="py-3 px-6 bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium text-white transition-colors shadow-sm inline-flex items-center gap-2"
-					>
-						{#if isOptimizing}
-							<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-							</svg>
-							Optimizing...
-						{:else}
-							Optimize with SVGO
-						{/if}
-					</button>
-				</div>
-				{/if}
-			</section>
-			{/if}
-
-			{#if optimizedSvg}
-			<!-- Optimized SVG Result -->
-			<section class="space-y-4 pt-8 border-t border-gray-100" aria-label="Optimized SVG Result">
-				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-					<div>
-						<h2 class="text-xl font-bold flex items-center gap-2">
-							Optimized SVG
-							<span class="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded-full font-medium">Reduced by {Math.round((1 - optimizedSize/svgSize)*100)}%</span>
-						</h2>
-						<p class="text-sm text-gray-500">File size: {formatBytes(optimizedSize)} (was {formatBytes(svgSize)})</p>
-					</div>
-					
-					<div class="flex items-center gap-4 w-full sm:w-auto">
-						<div class="flex items-center gap-2 flex-1 sm:flex-none">
-							<span class="text-xs text-gray-500">Zoom</span>
-							<input type="range" min="0.1" max="3" step="0.1" bind:value={optZoom} class="w-24 accent-black" aria-label="Zoom optimized SVG" />
-							<span class="text-xs text-gray-500 w-8">{Math.round(optZoom * 100)}%</span>
-						</div>
+					<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 max-w-lg w-full">
+						<h3 class="font-bold text-gray-900 mb-2">Want a smaller file size with cleaner paths?</h3>
+						<p class="text-sm text-gray-600 mb-6">Running SVGO will merge overlapping paths, round crazy decimal points, and compress the math.</p>
 						<button 
-							onclick={() => download(optimizedSvg as string, 'arco-optimized.svg')}
-							class="px-4 py-2 bg-black hover:bg-gray-800 text-sm font-medium rounded-lg transition-colors text-white shadow-sm"
+							onclick={optimizeSvg}
+							disabled={isOptimizing}
+							class="w-full py-3.5 px-6 bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium text-white transition-colors shadow-sm inline-flex items-center justify-center gap-2"
 						>
-							Download
+							{#if isOptimizing}
+								<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								Optimizing...
+							{:else}
+								Optimize with SVGO
+							{/if}
 						</button>
 					</div>
 				</div>
-
-				<div class="bg-gray-50 rounded-2xl overflow-auto border border-gray-100 h-[400px] w-full relative">
-					<div style="width: {optZoom * 100}%; min-width: 100%; transition: width 0.2s ease-out;" class="flex items-center justify-center p-4 mx-auto">
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html optimizedSvg}
-					</div>
-				</div>
+				{/if}
 			</section>
 			{/if}
 
