@@ -38,7 +38,7 @@
 
 	let selectedFile: File | null = $state(null);
 	let rasterDataUrl: string | null = $state(null);
-	let masterImgd: ImageData | null = null;
+	let masterImgd: ImageData | null = $state(null);
 	let originalImgd: ImageData | null = null;
 	let originalSize = $state(0);
 
@@ -831,14 +831,17 @@
 
 	<!-- Crop UI Overlay -->
 	{#if isCropping && rasterDataUrl && masterImgd}
-	<div class="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-200">
-		<div class="absolute top-8 text-white font-bold text-lg tracking-wider">Crop Image</div>
+	<div class="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center animate-in fade-in duration-200">
+		<div class="flex-none h-16 sm:h-24 flex items-center justify-center">
+			<div class="text-white font-bold text-lg tracking-wider">Crop Image</div>
+		</div>
 		
-		<div class="relative w-[90vw] h-[70vh] flex items-center justify-center p-4">
+		<div class="flex-1 w-[95vw] md:w-[80vw] flex items-center justify-center p-2 min-h-0">
 			<div id="crop-container" class="relative max-w-full max-h-full" style="aspect-ratio: {masterImgd.width}/{masterImgd.height}; height: 100%;">
 				<!-- svelte-ignore a11y_missing_attribute -->
 				<img src={rasterDataUrl} class="w-full h-full object-contain block pointer-events-none opacity-50" />
 				
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div 
 					class="absolute border-2 border-white cursor-move touch-none overflow-hidden"
 					style="left: {cropX * 100}%; top: {cropY * 100}%; width: {cropW * 100}%; height: {cropH * 100}%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"
@@ -883,9 +886,9 @@
 			</div>
 		</div>
 		
-		<div class="absolute bottom-12 flex gap-4">
-			<button class="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-full transition-colors" onclick={() => isCropping = false}>Cancel</button>
-			<button class="px-8 py-3 bg-white text-black font-bold rounded-full transition-colors hover:bg-gray-100 shadow-lg" onclick={applyCrop}>Apply Crop</button>
+		<div class="flex-none h-24 sm:h-32 flex items-center justify-center gap-3 sm:gap-4">
+			<button class="px-6 py-2.5 sm:px-8 sm:py-3 text-sm sm:text-base bg-white/10 hover:bg-white/20 text-white font-bold rounded-full transition-colors" onclick={() => isCropping = false}>Cancel</button>
+			<button class="px-6 py-2.5 sm:px-8 sm:py-3 text-sm sm:text-base bg-white text-black font-bold rounded-full transition-colors hover:bg-gray-100 shadow-lg" onclick={applyCrop}>Apply Crop</button>
 		</div>
 	</div>
 	{/if}
