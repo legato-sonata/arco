@@ -30,45 +30,88 @@
 	let scrollY = $state(0);
 
 	let isDraggingSplit = $state(false);
-	let viewerContainer: HTMLDivElement | undefined;
-	let clipViewport: HTMLDivElement | undefined;
+	let viewerContainer: HTMLDivElement | undefined = $state();
+	let clipViewport: HTMLDivElement | undefined = $state();
 
-	let activePointers = new Map<number, PointerEvent>();
+	let panX = $state(0);
+	let panY = $state(0);
+	let isPanning = $state(false);
+	let initialPanX = 0;
+	let initialPanY = 0;
+	let pinchMidpoint = { x: 0, y: 0 };
+	let lastPanPosition = { x: 0, y: 0 };
+
+	let activePointers = new Map<number, {x: number, y: number}>();
 	let isPinching = $state(false);
 	let initialPinchDistance = 0;
 	let initialZoomLevel = 1;
 
 	function handleZoom(amount: number) {
-		zoomLevel = Math.max(0.1, Math.min(10, zoomLevel + amount));
+		const newZoom = Math.max(0.1, Math.min(10, zoomLevel + amount));
+		if (viewerContainer) {
+			const rect = viewerContainer.getBoundingClientRect();
+			const midX = rect.width / 2;
+			const midY = rect.height / 2;
+			panX = midX - (midX - panX) * (newZoom / zoomLevel);
+			panY = midY - (midY - panY) * (newZoom / zoomLevel);
+		}
+		zoomLevel = newZoom;
 	}
 
 	function onPointerDown(e: PointerEvent) {
-		activePointers.set(e.pointerId, e);
-		if (activePointers.size === 2) {
+		activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		
+		if (activePointers.size === 1) {
+			isPanning = true;
+			lastPanPosition = { x: e.clientX, y: e.clientY };
+		} else if (activePointers.size === 2) {
+			isPanning = false;
 			isPinching = true;
 			const pointers = Array.from(activePointers.values());
 			initialPinchDistance = Math.hypot(
-				pointers[0].clientX - pointers[1].clientX,
-				pointers[0].clientY - pointers[1].clientY
+				pointers[0].x - pointers[1].x,
+				pointers[0].y - pointers[1].y
 			);
 			initialZoomLevel = zoomLevel;
+			initialPanX = panX;
+			initialPanY = panY;
+
+			const rect = viewerContainer?.getBoundingClientRect();
+			const offsetX = rect ? rect.left : 0;
+			const offsetY = rect ? rect.top : 0;
+
+			pinchMidpoint = {
+				x: ((pointers[0].x + pointers[1].x) / 2) - offsetX,
+				y: ((pointers[0].y + pointers[1].y) / 2) - offsetY
+			};
 		}
 	}
 
 	function onPointerMove(e: PointerEvent) {
-		if (activePointers.has(e.pointerId)) {
-			activePointers.set(e.pointerId, e);
-		}
+		if (!activePointers.has(e.pointerId)) return;
+		activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		
-		if (activePointers.size === 2 && isPinching) {
+		if (activePointers.size === 1 && isPanning) {
+			const dx = e.clientX - lastPanPosition.x;
+			const dy = e.clientY - lastPanPosition.y;
+			panX += dx;
+			panY += dy;
+			lastPanPosition = { x: e.clientX, y: e.clientY };
+		} else if (activePointers.size === 2 && isPinching) {
 			const pointers = Array.from(activePointers.values());
 			const currentDistance = Math.hypot(
-				pointers[0].clientX - pointers[1].clientX,
-				pointers[0].clientY - pointers[1].clientY
+				pointers[0].x - pointers[1].x,
+				pointers[0].y - pointers[1].y
 			);
+			
 			if (initialPinchDistance > 0) {
-				const scale = currentDistance / initialPinchDistance;
-				zoomLevel = Math.max(0.1, Math.min(10, initialZoomLevel * scale));
+				const scaleRatio = currentDistance / initialPinchDistance;
+				const newZoom = Math.max(0.1, Math.min(10, initialZoomLevel * scaleRatio));
+				
+				panX = pinchMidpoint.x - (pinchMidpoint.x - initialPanX) * (newZoom / initialZoomLevel);
+				panY = pinchMidpoint.y - (pinchMidpoint.y - initialPanY) * (newZoom / initialZoomLevel);
+				
+				zoomLevel = newZoom;
 			}
 		}
 	}
@@ -79,11 +122,22 @@
 			isPinching = false;
 			initialPinchDistance = 0;
 		}
+		if (activePointers.size === 1) {
+			const remainingPointer = Array.from(activePointers.values())[0];
+			isPanning = true;
+			lastPanPosition = { x: remainingPointer.x, y: remainingPointer.y };
+		} else if (activePointers.size === 0) {
+			isPanning = false;
+		}
+	}
+
+	function onPointerLeave(e: PointerEvent) {
+		onPointerUp(e);
 	}
 
 	function onPointerDownSplit(e: PointerEvent) {
 		isDraggingSplit = true;
-		e.target?.setPointerCapture(e.pointerId);
+		(e.target as Element)?.setPointerCapture(e.pointerId);
 	}
 
 	function onPointerMoveSplit(e: PointerEvent) {
@@ -95,7 +149,7 @@
 
 	function onPointerUpSplit(e: PointerEvent) {
 		isDraggingSplit = false;
-		e.target?.releasePointerCapture(e.pointerId);
+		(e.target as Element)?.releasePointerCapture(e.pointerId);
 	}
 
 	function handleBaseScroll(e: Event) {
@@ -149,8 +203,11 @@
 		originalSize = file.size;
 		originalSvg = null;
 		optimizedSvg = null;
+		isConverting = true;
+		
+		panX = 0;
+		panY = 0;
 		zoomLevel = 1;
-		splitPos = 50;
 
 		const reader = new FileReader();
 		reader.onload = (e) => {
@@ -397,7 +454,8 @@
 					</div>
 				</div>
 
-				<div class="relative w-full h-[60vh] min-h-[400px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-inner flex flex-col" bind:this={viewerContainer} onpointerdown={onPointerDown} onpointermove={onPointerMove} onpointerup={onPointerUp} onpointercancel={onPointerUp}>
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="relative w-full h-[60vh] min-h-[400px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-inner flex flex-col" style="touch-action: none;" bind:this={viewerContainer} onpointerdown={onPointerDown} onpointermove={onPointerMove} onpointerup={onPointerUp} onpointercancel={onPointerUp} onpointerleave={onPointerLeave}>
 					
 					<!-- Top Status Labels -->
 					{#if optimizedSvg}
@@ -427,11 +485,11 @@
 					</div>
 
 					<!-- Viewport -->
-					<div class="flex-1 relative touch-pan-x touch-pan-y bg-gray-50">
+					<div class="flex-1 relative bg-gray-50 overflow-hidden">
 						{#if !optimizedSvg}
-							<div class="absolute inset-0 overflow-auto">
-								<div style="width: {zoomLevel * 100}%; min-width: 100%; {isPinching ? '' : 'transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="relative min-h-full flex items-center justify-center pointer-events-none p-4 mx-auto">
-									<div class="w-full pointer-events-auto">
+							<div class="absolute inset-0">
+								<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
+									<div class="w-full h-full flex items-center justify-center pointer-events-none">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html originalSvg}
 									</div>
@@ -440,9 +498,9 @@
 						{:else}
 							<!-- Comparison Wrapper -->
 							<!-- Base Layer (Optimized) -->
-							<div class="absolute inset-0 overflow-auto" onscroll={handleBaseScroll}>
-								<div style="width: {zoomLevel * 100}%; min-width: 100%; {isPinching ? '' : 'transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
-									<div class="w-full">
+							<div class="absolute inset-0">
+								<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
+									<div class="w-full h-full flex items-center justify-center pointer-events-none">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html optimizedSvg}
 									</div>
@@ -450,15 +508,16 @@
 							</div>
 
 							<!-- Clipped Layer (Raw) -->
-							<div class="absolute inset-0 overflow-auto pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:this={clipViewport}>
-								<div style="width: {zoomLevel * 100}%; min-width: 100%; {isPinching ? '' : 'transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="relative min-h-full flex items-center justify-center p-4 mx-auto">
-									<div class="w-full">
+							<div class="absolute inset-0 pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:this={clipViewport}>
+								<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
+									<div class="w-full h-full flex items-center justify-center pointer-events-none">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html originalSvg}
 									</div>
 								</div>
 							</div>
 
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<!-- Custom Draggable Split Line -->
 							<div class="absolute inset-y-0 w-1 bg-black z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)] touch-none select-none hover:bg-gray-800" 
 								style="left: {splitPos}%; transform: translateX(-50%); cursor: ew-resize;"
