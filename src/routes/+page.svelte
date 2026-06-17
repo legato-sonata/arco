@@ -865,23 +865,23 @@
 					
 					<!-- Handles -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute -top-3 -left-3 w-6 h-6 bg-white rounded-full shadow cursor-nwse-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'tl')}></div>
+					<div class="absolute -top-3 -left-3 w-6 h-6 bg-white rounded-full shadow cursor-nwse-resize touch-none before:absolute before:-inset-4 before:content-['']" onpointerdown={(e) => onCropPointerDown(e, 'tl')}></div>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute -top-3 -right-3 w-6 h-6 bg-white rounded-full shadow cursor-nesw-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'tr')}></div>
+					<div class="absolute -top-3 -right-3 w-6 h-6 bg-white rounded-full shadow cursor-nesw-resize touch-none before:absolute before:-inset-4 before:content-['']" onpointerdown={(e) => onCropPointerDown(e, 'tr')}></div>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute -bottom-3 -left-3 w-6 h-6 bg-white rounded-full shadow cursor-nesw-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'bl')}></div>
+					<div class="absolute -bottom-3 -left-3 w-6 h-6 bg-white rounded-full shadow cursor-nesw-resize touch-none before:absolute before:-inset-4 before:content-['']" onpointerdown={(e) => onCropPointerDown(e, 'bl')}></div>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute -bottom-3 -right-3 w-6 h-6 bg-white rounded-full shadow cursor-nwse-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'br')}></div>
+					<div class="absolute -bottom-3 -right-3 w-6 h-6 bg-white rounded-full shadow cursor-nwse-resize touch-none before:absolute before:-inset-4 before:content-['']" onpointerdown={(e) => onCropPointerDown(e, 'br')}></div>
 					
 					<!-- Edges -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute top-0 left-0 right-0 h-4 -translate-y-2 cursor-ns-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 't')}></div>
+					<div class="absolute top-0 left-0 right-0 h-8 -translate-y-4 cursor-ns-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 't')}></div>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute bottom-0 left-0 right-0 h-4 translate-y-2 cursor-ns-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'b')}></div>
+					<div class="absolute bottom-0 left-0 right-0 h-8 translate-y-4 cursor-ns-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'b')}></div>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute top-0 bottom-0 left-0 w-4 -translate-x-2 cursor-ew-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'l')}></div>
+					<div class="absolute top-0 bottom-0 left-0 w-8 -translate-x-4 cursor-ew-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'l')}></div>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute top-0 bottom-0 right-0 w-4 translate-x-2 cursor-ew-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'r')}></div>
+					<div class="absolute top-0 bottom-0 right-0 w-8 translate-x-4 cursor-ew-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'r')}></div>
 				</div>
 			</div>
 		</div>
