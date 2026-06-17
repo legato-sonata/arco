@@ -875,13 +875,21 @@
 					
 					<!-- Edges -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute top-0 left-0 right-0 h-8 -translate-y-4 cursor-ns-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 't')}></div>
+					<div class="absolute top-0 left-0 right-0 h-8 -translate-y-4 cursor-ns-resize touch-none flex items-center justify-center" onpointerdown={(e) => onCropPointerDown(e, 't')}>
+						<div class="w-8 h-1.5 bg-white rounded-full shadow"></div>
+					</div>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute bottom-0 left-0 right-0 h-8 translate-y-4 cursor-ns-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'b')}></div>
+					<div class="absolute bottom-0 left-0 right-0 h-8 translate-y-4 cursor-ns-resize touch-none flex items-center justify-center" onpointerdown={(e) => onCropPointerDown(e, 'b')}>
+						<div class="w-8 h-1.5 bg-white rounded-full shadow"></div>
+					</div>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute top-0 bottom-0 left-0 w-8 -translate-x-4 cursor-ew-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'l')}></div>
+					<div class="absolute top-0 bottom-0 left-0 w-8 -translate-x-4 cursor-ew-resize touch-none flex items-center justify-center" onpointerdown={(e) => onCropPointerDown(e, 'l')}>
+						<div class="w-1.5 h-8 bg-white rounded-full shadow"></div>
+					</div>
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="absolute top-0 bottom-0 right-0 w-8 translate-x-4 cursor-ew-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'r')}></div>
+					<div class="absolute top-0 bottom-0 right-0 w-8 translate-x-4 cursor-ew-resize touch-none flex items-center justify-center" onpointerdown={(e) => onCropPointerDown(e, 'r')}>
+						<div class="w-1.5 h-8 bg-white rounded-full shadow"></div>
+					</div>
 				</div>
 			</div>
 		</div>
