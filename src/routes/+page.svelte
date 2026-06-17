@@ -4,131 +4,93 @@
 	import ImageTracer from 'imagetracerjs';
 
 	let fileInput: HTMLInputElement;
-	let optionsSection: HTMLElement | undefined = $state();
-	let resultSection: HTMLElement | undefined = $state();
+	let viewerContainer: HTMLDivElement | undefined = $state();
+	let clipViewport: HTMLDivElement | undefined = $state();
+	let showOptions = $state(false);
+
 	let isDragging = $state(false);
 	let isConverting = $state(false);
 	let isOptimizing = $state(false);
 
 	let selectedFile: File | null = $state(null);
 	let rasterDataUrl: string | null = $state(null);
+	let originalSize = $state(0);
 	
 	let originalSvg: string | null = $state(null);
-	let optimizedSvg: string | null = $state(null);
-
-	let originalSize = $state(0);
 	let svgSize = $state(0);
+	
+	let optimizedSvg: string | null = $state(null);
 	let optimizedSize = $state(0);
 
-	// ImageTracer options
 	let ltres = $state(1);
 	let qtres = $state(1);
 	let pathomit = $state(8);
 
-	// Unified Viewer State
-	let zoomLevel = $state(1);
-	let splitPos = $state(50);
-	
-	let scrollX = $state(0);
-	let scrollY = $state(0);
-
-	let isDraggingSplit = $state(false);
-	let viewerContainer: HTMLDivElement | undefined = $state();
-	let clipViewport: HTMLDivElement | undefined = $state();
-
 	let panX = $state(0);
 	let panY = $state(0);
+	let zoomLevel = $state(1);
 	let isPanning = $state(false);
-	let initialPanX = 0;
-	let initialPanY = 0;
-	let pinchMidpoint = { x: 0, y: 0 };
-	let lastPanPosition = { x: 0, y: 0 };
+	let startX = $state(0);
+	let startY = $state(0);
 
-	let activePointers = new Map<number, {x: number, y: number}>();
+	let activePointers = $state(new Map<number, { x: number; y: number }>());
+	let initialPinchDistance = $state<number | null>(null);
+	let initialZoomLevel = $state(1);
 	let isPinching = $state(false);
-	let initialPinchDistance = 0;
-	let initialZoomLevel = 1;
 
-	function handleZoom(amount: number) {
-		const newZoom = Math.max(0.1, Math.min(10, zoomLevel + amount));
-		if (viewerContainer) {
-			const rect = viewerContainer.getBoundingClientRect();
-			const midX = rect.width / 2;
-			const midY = rect.height / 2;
-			panX = midX - (midX - panX) * (newZoom / zoomLevel);
-			panY = midY - (midY - panY) * (newZoom / zoomLevel);
-		}
-		zoomLevel = newZoom;
+	let splitPos = $state(50);
+	let isDraggingSplit = $state(false);
+
+	function getDistance(p1: { x: number; y: number }, p2: { x: number; y: number }) {
+		return Math.hypot(p2.x - p1.x, p2.y - p1.y);
 	}
 
 	function onPointerDown(e: PointerEvent) {
 		activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		
+		(e.target as Element)?.setPointerCapture(e.pointerId);
+
 		if (activePointers.size === 1) {
 			isPanning = true;
-			lastPanPosition = { x: e.clientX, y: e.clientY };
+			isPinching = false;
+			startX = e.clientX - panX;
+			startY = e.clientY - panY;
 		} else if (activePointers.size === 2) {
 			isPanning = false;
 			isPinching = true;
-			const pointers = Array.from(activePointers.values());
-			initialPinchDistance = Math.hypot(
-				pointers[0].x - pointers[1].x,
-				pointers[0].y - pointers[1].y
-			);
+			const pts = Array.from(activePointers.values());
+			initialPinchDistance = getDistance(pts[0], pts[1]);
 			initialZoomLevel = zoomLevel;
-			initialPanX = panX;
-			initialPanY = panY;
-
-			const rect = viewerContainer?.getBoundingClientRect();
-			const offsetX = rect ? rect.left : 0;
-			const offsetY = rect ? rect.top : 0;
-
-			pinchMidpoint = {
-				x: ((pointers[0].x + pointers[1].x) / 2) - offsetX,
-				y: ((pointers[0].y + pointers[1].y) / 2) - offsetY
-			};
 		}
 	}
 
 	function onPointerMove(e: PointerEvent) {
 		if (!activePointers.has(e.pointerId)) return;
 		activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		
-		if (activePointers.size === 1 && isPanning) {
-			const dx = e.clientX - lastPanPosition.x;
-			const dy = e.clientY - lastPanPosition.y;
-			panX += dx;
-			panY += dy;
-			lastPanPosition = { x: e.clientX, y: e.clientY };
-		} else if (activePointers.size === 2 && isPinching) {
-			const pointers = Array.from(activePointers.values());
-			const currentDistance = Math.hypot(
-				pointers[0].x - pointers[1].x,
-				pointers[0].y - pointers[1].y
-			);
-			
-			if (initialPinchDistance > 0) {
-				const scaleRatio = currentDistance / initialPinchDistance;
-				const newZoom = Math.max(0.1, Math.min(10, initialZoomLevel * scaleRatio));
-				
-				panX = pinchMidpoint.x - (pinchMidpoint.x - initialPanX) * (newZoom / initialZoomLevel);
-				panY = pinchMidpoint.y - (pinchMidpoint.y - initialPanY) * (newZoom / initialZoomLevel);
-				
-				zoomLevel = newZoom;
-			}
+
+		if (isPinching && activePointers.size === 2 && initialPinchDistance) {
+			const pts = Array.from(activePointers.values());
+			const currentDist = getDistance(pts[0], pts[1]);
+			const scaleDelta = currentDist / initialPinchDistance;
+			zoomLevel = Math.max(0.1, Math.min(5, initialZoomLevel * scaleDelta));
+		} else if (isPanning && activePointers.size === 1) {
+			panX = e.clientX - startX;
+			panY = e.clientY - startY;
 		}
 	}
 
 	function onPointerUp(e: PointerEvent) {
 		activePointers.delete(e.pointerId);
+		(e.target as Element)?.releasePointerCapture(e.pointerId);
+
 		if (activePointers.size < 2) {
 			isPinching = false;
-			initialPinchDistance = 0;
+			initialPinchDistance = null;
 		}
 		if (activePointers.size === 1) {
-			const remainingPointer = Array.from(activePointers.values())[0];
 			isPanning = true;
-			lastPanPosition = { x: remainingPointer.x, y: remainingPointer.y };
+			const pt = Array.from(activePointers.values())[0];
+			startX = pt.x - panX;
+			startY = pt.y - panY;
 		} else if (activePointers.size === 0) {
 			isPanning = false;
 		}
@@ -156,13 +118,6 @@
 		e.stopPropagation();
 		isDraggingSplit = false;
 		(e.target as Element)?.releasePointerCapture(e.pointerId);
-	}
-
-	function handleBaseScroll(e: Event) {
-		if (!clipViewport) return;
-		const target = e.target as HTMLDivElement;
-		clipViewport.scrollTop = target.scrollTop;
-		clipViewport.scrollLeft = target.scrollLeft;
 	}
 
 	function fixSvgForZoom(svgStr: string) {
@@ -209,16 +164,15 @@
 		originalSize = file.size;
 		originalSvg = null;
 		optimizedSvg = null;
+		showOptions = false;
 		
-		panX = 0;
-		panY = 0;
-		zoomLevel = 1;
+		panX = 0; panY = 0; zoomLevel = 1;
 
 		const reader = new FileReader();
 		reader.onload = async (e) => {
 			rasterDataUrl = e.target?.result as string;
 			await tick();
-			optionsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			trace();
 		};
 		reader.readAsDataURL(file);
 	}
@@ -227,9 +181,7 @@
 		if (!rasterDataUrl) return;
 		isConverting = true;
 		optimizedSvg = null; // reset optimization if we re-trace
-		zoomLevel = 1;
-		splitPos = 50;
-
+		
 		await new Promise(r => setTimeout(r, 50));
 
 		try {
@@ -261,10 +213,6 @@
 			alert("An error occurred during tracing.");
 		} finally {
 			isConverting = false;
-			if (originalSvg) {
-				await tick();
-				resultSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-			}
 		}
 	}
 
@@ -299,14 +247,10 @@
 			alert("An error occurred during optimization.");
 		} finally {
 			isOptimizing = false;
-			if (optimizedSvg) {
-				await tick();
-				resultSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-			}
 		}
 	}
 
-	function download(content: string, filename: string) {
+	function downloadFile(content: string, filename: string) {
 		const blob = new Blob([content], { type: 'image/svg+xml' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -317,360 +261,274 @@
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
 	}
+	
+	function downloadActive() {
+		if (optimizedSvg) downloadFile(optimizedSvg as string, 'arco-optimized.svg');
+		else if (originalSvg) downloadFile(originalSvg as string, 'arco-raw.svg');
+	}
 </script>
 
-<div class="min-h-screen bg-white text-black font-sans selection:bg-gray-200 pb-32 relative">
-	<div class="max-w-4xl mx-auto px-4 py-8 md:py-16 space-y-12">
-		<!-- Header -->
-		<header class="text-center space-y-3">
-			<h1 class="text-4xl md:text-5xl font-bold tracking-tight text-black">Arco</h1>
-			<p class="text-gray-500 text-base md:text-lg max-w-xl mx-auto">
-				Convert raster line art to SVG, then optimize.
-			</p>
-		</header>
+<div class="h-screen w-full bg-gray-50 text-black font-sans selection:bg-gray-200 overflow-hidden flex flex-col">
+	<input 
+		type="file" 
+		accept="image/png, image/jpeg" 
+		class="hidden" 
+		bind:this={fileInput}
+		onchange={handleFileInput}
+		aria-label="File upload"
+	>
 
-		<main class="space-y-12">
+	{#if !rasterDataUrl}
+		<!-- Upload Screen -->
+		<div class="flex-1 flex flex-col items-center justify-center p-6 space-y-8 max-w-2xl mx-auto w-full">
+			<header class="text-center space-y-3">
+				<h1 class="text-5xl md:text-6xl font-bold tracking-tight text-black">Arco</h1>
+				<p class="text-gray-500 text-lg md:text-xl">Convert raster line art to SVG, instantly.</p>
+			</header>
+
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<div 
+				role="button"
+				tabindex="0"
+				class="relative overflow-hidden w-full rounded-3xl transition-all duration-300 flex flex-col items-center justify-center p-10 md:p-16 text-center cursor-pointer border-2 {isDragging ? 'border-black bg-gray-100' : 'border-dashed border-gray-300 hover:border-gray-500 hover:bg-gray-100'}"
+				ondragover={(e) => { e.preventDefault(); isDragging = true; }}
+				ondragleave={() => { isDragging = false; }}
+				ondrop={handleDrop}
+				onclick={() => fileInput.click()}
+			>
+				<div class="space-y-4 pointer-events-none">
+					<div class="w-16 h-16 mx-auto rounded-full bg-white shadow-sm flex items-center justify-center text-black border border-gray-100">
+						<svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+						</svg>
+					</div>
+					<div>
+						<p class="text-xl font-semibold text-black mb-1">Upload your sketch</p>
+						<p class="text-gray-500">Drag & drop or tap to select</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	{:else}
+		<!-- Unified Workspace -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div 
+			class="flex-1 relative w-full h-full bg-gray-100 overflow-hidden select-none" 
+			style="touch-action: none;" 
+			bind:this={viewerContainer}
+			onpointerdown={onPointerDown}
+			onpointermove={onPointerMove}
+			onpointerup={onPointerUp}
+			onpointercancel={onPointerUp}
+			onpointerleave={onPointerLeave}
+		>
 			
-			<!-- Upload Zone -->
-			<section aria-label="Upload Image">
-				<div 
-					role="button"
-					tabindex="0"
-					class="relative overflow-hidden rounded-2xl transition-all duration-300 flex flex-col items-center justify-center p-8 md:p-12 text-center cursor-pointer min-h-[200px] border-2 {isDragging ? 'border-black bg-gray-50' : 'border-dashed border-gray-300 hover:border-gray-500 hover:bg-gray-50'}"
-					ondragover={(e) => { e.preventDefault(); isDragging = true; }}
-					ondragleave={() => { isDragging = false; }}
-					ondrop={handleDrop}
-					onclick={() => fileInput.click()}
-					onkeydown={(e) => e.key === 'Enter' && fileInput.click()}
-				>
-					<input 
-						type="file" 
-						accept="image/png, image/jpeg" 
-						class="hidden" 
-						bind:this={fileInput}
-						onchange={handleFileInput}
-						aria-label="File upload"
-					>
-					<div class="space-y-3 pointer-events-none">
-						<div class="w-12 h-12 mx-auto rounded-full bg-gray-100 flex items-center justify-center text-black">
-							<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-							</svg>
-						</div>
-						<div>
-							<p class="font-medium text-black">Tap to upload or drag and drop</p>
-							<p class="text-sm text-gray-500 mt-1">PNG or JPG (Line art)</p>
-						</div>
-					</div>
+			<!-- Canvas Content -->
+			{#if !originalSvg}
+				<div class="absolute inset-0 flex items-center justify-center p-4">
+					<img src={rasterDataUrl} alt="Original raster" class="max-w-full max-h-full object-contain opacity-50" />
 				</div>
-			</section>
-
-			{#if rasterDataUrl}
-			<!-- Source Preview and Options -->
-			<section bind:this={optionsSection} class="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500" aria-label="Tracing options and preview">
-				<div class="space-y-6">
-					<div>
-						<h2 class="text-lg font-semibold border-b border-gray-100 pb-2 mb-4">Original Image</h2>
-						<div class="bg-gray-50 rounded-xl p-4 flex items-center justify-center min-h-[200px] border border-gray-100">
-							<img src={rasterDataUrl} alt="Source Preview" class="max-w-full max-h-[300px] object-contain shadow-sm" />
-						</div>
-						<div class="text-sm text-gray-500 mt-2 text-right">Size: {formatBytes(originalSize)}</div>
-					</div>
-				</div>
-
-				<div class="space-y-6">
-					<h2 class="text-lg font-semibold border-b border-gray-100 pb-2">Tracing Options</h2>
-					
-					<div class="space-y-6">
-						<div class="space-y-2">
-							<div class="flex justify-between items-end">
-								<div>
-									<label for="ltres" class="text-gray-900 font-medium block">Detail Level</label>
-									<span class="text-xs text-gray-500 block max-w-[200px]">Lower = captures tiny details, Higher = ignores small squiggles</span>
-								</div>
-								<span class="text-gray-700 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{ltres}</span>
-							</div>
-							<input id="ltres" type="range" min="0.1" max="5" step="0.1" bind:value={ltres} class="w-full accent-black" />
-						</div>
-						
-						<div class="space-y-2">
-							<div class="flex justify-between items-end">
-								<div>
-									<label for="qtres" class="text-gray-900 font-medium block">Curve Smoothness</label>
-									<span class="text-xs text-gray-500 block max-w-[200px]">Lower = hugs original lines tightly, Higher = smoother curves</span>
-								</div>
-								<span class="text-gray-700 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{qtres}</span>
-							</div>
-							<input id="qtres" type="range" min="0.1" max="5" step="0.1" bind:value={qtres} class="w-full accent-black" />
-						</div>
-
-						<div class="space-y-2">
-							<div class="flex justify-between items-end">
-								<div>
-									<label for="pathomit" class="text-gray-900 font-medium block">Speckle Removal</label>
-									<span class="text-xs text-gray-500 block max-w-[200px]">Higher = removes stray dots and noise, Lower = keeps everything</span>
-								</div>
-								<span class="text-gray-700 font-mono text-sm bg-gray-100 px-2 py-1 rounded">{pathomit}</span>
-							</div>
-							<input id="pathomit" type="range" min="0" max="64" step="1" bind:value={pathomit} class="w-full accent-black" />
+			{:else}
+				<div class="absolute inset-0">
+					<!-- Base Layer (Optimized) -->
+					<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
+						<div class="w-full h-full flex items-center justify-center pointer-events-none">
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html optimizedSvg || originalSvg}
 						</div>
 					</div>
 
-					<button 
-						onclick={trace}
-						disabled={isConverting}
-						class="w-full py-3.5 px-4 bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium text-white transition-colors flex items-center justify-center gap-2 shadow-sm"
-					>
-						{#if isConverting}
-							<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-							</svg>
-							Tracing...
-						{:else}
-							Generate Vector (SVG)
-						{/if}
-					</button>
-				</div>
-			</section>
-			{/if}
-
-			{#if originalSvg}
-			<!-- Unified Result Viewer -->
-			<section bind:this={resultSection} class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500" aria-label="Result Viewer">
-				
-				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-					<div>
-						<h2 class="text-xl font-bold flex items-center gap-2">
-							Vector Result
-							{#if optimizedSvg}
-								<span class="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded-full font-medium">
-									Optimized (Reduced by {Math.round((1 - optimizedSize/svgSize)*100)}%)
-								</span>
-							{/if}
-						</h2>
-					</div>
-					
-					<div class="flex flex-wrap items-center gap-3">
-						<button 
-							onclick={() => download(originalSvg as string, 'arco-traced-raw.svg')}
-							class="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors text-black"
-						>
-							Download Raw
-						</button>
-						{#if optimizedSvg}
-							<button 
-								onclick={() => download(optimizedSvg as string, 'arco-optimized.svg')}
-								class="px-4 py-2 bg-black hover:bg-gray-800 text-sm font-medium rounded-lg transition-colors text-white shadow-sm"
-							>
-								Download Optimized
-							</button>
-						{/if}
-					</div>
-				</div>
-
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="relative w-full h-[60vh] min-h-[400px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-inner flex flex-col" style="touch-action: none;" bind:this={viewerContainer} onpointerdown={onPointerDown} onpointermove={onPointerMove} onpointerup={onPointerUp} onpointercancel={onPointerUp} onpointerleave={onPointerLeave}>
-					
-					<!-- Top Status Labels -->
+					<!-- Clipped Layer (Raw) - Only show if optimized exists -->
 					{#if optimizedSvg}
-						<div class="absolute top-4 left-4 z-20 flex gap-2">
-							<span class="bg-white/90 backdrop-blur text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm border border-gray-200 text-gray-600">
-								Raw ({formatBytes(svgSize)})
-							</span>
+					<div class="absolute inset-0 pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:this={clipViewport}>
+						<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
+							<div class="w-full h-full flex items-center justify-center pointer-events-none">
+								<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+								{@html originalSvg}
+							</div>
 						</div>
-						<div class="absolute top-4 right-4 z-20 flex gap-2">
-							<span class="bg-white/90 backdrop-blur text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm border border-gray-200 text-emerald-600">
-								Optimized ({formatBytes(optimizedSize)})
-							</span>
+					</div>
+
+					<!-- Split Line -->
+					<div class="absolute inset-y-0 w-1 bg-black z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)] touch-none select-none hover:bg-gray-800" 
+						style="left: {splitPos}%; transform: translateX(-50%); cursor: ew-resize;"
+						onpointerdown={onPointerDownSplit}
+						onpointermove={onPointerMoveSplit}
+						onpointerup={onPointerUpSplit}
+						onpointercancel={onPointerUpSplit}
+					>
+						<div class="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 w-10 h-10 bg-white border-2 border-black rounded-full flex items-center justify-center shadow-lg transition-transform {isDraggingSplit ? 'scale-95 bg-gray-50' : ''}">
+							<svg class="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" transform="rotate(90 12 12)" />
+							</svg>
 						</div>
+					</div>
 					{/if}
-
-					<!-- Floating Direct Zoom Controls -->
-					<div class="absolute bottom-6 right-6 z-30 flex items-center bg-white/90 backdrop-blur rounded-xl shadow-lg border border-gray-200 p-1">
-						<button onclick={() => handleZoom(-0.2)} class="p-2.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-700" aria-label="Zoom out">
-							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
-						</button>
-						<div class="flex items-center justify-center w-14 text-sm font-bold text-gray-800 select-none">
-							{Math.round(zoomLevel * 100)}%
-						</div>
-						<button onclick={() => handleZoom(0.2)} class="p-2.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-700" aria-label="Zoom in">
-							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-						</button>
-					</div>
-
-					<!-- Viewport -->
-					<div class="flex-1 relative bg-gray-50 overflow-hidden">
-						{#if !optimizedSvg}
-							<div class="absolute inset-0">
-								<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
-									<div class="w-full h-full flex items-center justify-center pointer-events-none">
-										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-										{@html originalSvg}
-									</div>
-								</div>
-							</div>
-						{:else}
-							<!-- Comparison Wrapper -->
-							<!-- Base Layer (Optimized) -->
-							<div class="absolute inset-0">
-								<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
-									<div class="w-full h-full flex items-center justify-center pointer-events-none">
-										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-										{@html optimizedSvg}
-									</div>
-								</div>
-							</div>
-
-							<!-- Clipped Layer (Raw) -->
-							<div class="absolute inset-0 pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:this={clipViewport}>
-								<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
-									<div class="w-full h-full flex items-center justify-center pointer-events-none">
-										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-										{@html originalSvg}
-									</div>
-								</div>
-							</div>
-
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<!-- Custom Draggable Split Line -->
-							<div class="absolute inset-y-0 w-1 bg-black z-10 shadow-[0_0_0_1px_rgba(255,255,255,0.2)] touch-none select-none hover:bg-gray-800" 
-								style="left: {splitPos}%; transform: translateX(-50%); cursor: ew-resize;"
-								onpointerdown={onPointerDownSplit}
-								onpointermove={onPointerMoveSplit}
-								onpointerup={onPointerUpSplit}
-								onpointercancel={onPointerUpSplit}
-							>
-								<!-- Dragger Handle -->
-								<div class="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 w-10 h-10 bg-white border-2 border-black rounded-full flex items-center justify-center shadow-lg transition-transform {isDraggingSplit ? 'scale-95 bg-gray-50' : ''}">
-									<svg class="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" transform="rotate(90 12 12)" />
-									</svg>
-								</div>
-							</div>
-						{/if}
-					</div>
 				</div>
-
-				<!-- Optimization Prompt -->
-				{#if !optimizedSvg}
-				<div class="pt-6 flex flex-col items-center text-center space-y-4">
-					<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 max-w-lg w-full">
-						<h3 class="font-bold text-gray-900 mb-2">Want a smaller file size with cleaner paths?</h3>
-						<p class="text-sm text-gray-600 mb-6">Running SVGO will merge overlapping paths, round crazy decimal points, and compress the math.</p>
-						<button 
-							onclick={optimizeSvg}
-							disabled={isOptimizing}
-							class="w-full py-3.5 px-6 bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium text-white transition-colors shadow-sm inline-flex items-center justify-center gap-2"
-						>
-							{#if isOptimizing}
-								<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-								</svg>
-								Optimizing...
-							{:else}
-								Optimize with SVGO
-							{/if}
-						</button>
-					</div>
-				</div>
-				{/if}
-			</section>
 			{/if}
 
-		</main>
-
-		<!-- Floating Action Dock -->
-		{#if rasterDataUrl}
-		<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-300">
-			<div class="bg-black/90 backdrop-blur-md shadow-2xl border border-gray-800 rounded-full px-2 py-2 flex items-center gap-1 sm:gap-2">
-				<!-- New Image -->
-				<button 
-					onclick={() => fileInput.click()}
-					class="flex flex-col items-center justify-center px-3 min-w-[64px] h-14 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-					title="Upload New Image"
-				>
-					<svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-					</svg>
-					<span class="text-[9px] font-semibold uppercase tracking-wider">New</span>
-				</button>
-
-				<div class="w-px h-8 bg-gray-700"></div>
-
-				<!-- Trace Options -->
-				<button 
-					onclick={() => optionsSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-					class="flex flex-col items-center justify-center px-3 min-w-[64px] h-14 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-					title="Trace Options"
-				>
-					<svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-					</svg>
-					<span class="text-[9px] font-semibold uppercase tracking-wider">Options</span>
-				</button>
-
-				{#if originalSvg}
-				<div class="w-px h-8 bg-gray-700"></div>
-
-				<!-- Optimize (only if not optimized yet) -->
-				{#if !optimizedSvg}
-				<button 
-					onclick={optimizeSvg}
-					disabled={isOptimizing}
-					class="flex flex-col items-center justify-center px-3 min-w-[64px] h-14 rounded-full text-emerald-400 hover:text-emerald-300 hover:bg-white/10 transition-colors disabled:opacity-50"
-					title="Optimize SVG"
-				>
-					{#if isOptimizing}
-					<svg class="animate-spin w-5 h-5 mb-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+			<!-- Loading Overlay -->
+			{#if isConverting || isOptimizing}
+			<div class="absolute inset-0 bg-white/40 backdrop-blur-sm z-30 flex items-center justify-center pointer-events-none transition-opacity duration-300">
+				<div class="bg-black text-white px-6 py-3 rounded-2xl flex items-center gap-3 shadow-2xl text-sm font-semibold">
+					<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 					</svg>
-					{:else}
-					<svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-					</svg>
-					{/if}
-					<span class="text-[9px] font-semibold uppercase tracking-wider">Optimize</span>
-				</button>
+					{isConverting ? 'Tracing Vector...' : 'Optimizing Paths...'}
+				</div>
+			</div>
+			{/if}
 
-				<div class="w-px h-8 bg-gray-700"></div>
+			<!-- Original Image Minimap (Top Right) -->
+			<div class="absolute top-4 right-4 z-20 pointer-events-none flex flex-col items-end gap-2">
+				<div class="w-24 h-24 md:w-32 md:h-32 bg-white/80 backdrop-blur rounded-2xl shadow-lg border border-white/50 p-2 relative overflow-hidden transition-all duration-500 hover:scale-105">
+					<img src={rasterDataUrl} alt="Original" class="w-full h-full object-contain" />
+					<div class="absolute bottom-1 right-1 bg-black/60 backdrop-blur-md text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm">
+						Source
+					</div>
+				</div>
+				<!-- Zoom Indicator -->
+				<div class="bg-white/90 backdrop-blur border border-white/50 px-3 py-1.5 rounded-full shadow-sm text-xs font-bold text-gray-700">
+					{Math.round(zoomLevel * 100)}%
+				</div>
+			</div>
+
+			<!-- Status Badges (Top Left) -->
+			<div class="absolute top-4 left-4 z-20 flex flex-col gap-2 pointer-events-none">
+				{#if originalSvg}
+				<div class="bg-white/90 backdrop-blur text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-full shadow-sm border border-white/50 text-gray-700 uppercase tracking-wider flex items-center gap-2">
+					<span class="w-2 h-2 rounded-full bg-blue-500"></span>
+					Raw SVG ({formatBytes(svgSize)})
+				</div>
 				{/if}
-
-				<!-- View Result -->
-				<button 
-					onclick={() => resultSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-					class="flex flex-col items-center justify-center px-3 min-w-[64px] h-14 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-					title="View Result"
-				>
-					<svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-					</svg>
-					<span class="text-[9px] font-semibold uppercase tracking-wider">Viewer</span>
-				</button>
-
-				<div class="w-px h-8 bg-gray-700"></div>
-
-				<!-- Reset Zoom -->
-				<button 
-					onclick={() => {
-						panX = 0; panY = 0; zoomLevel = 1;
-						resultSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-					}}
-					class="flex flex-col items-center justify-center px-3 min-w-[64px] h-14 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-					title="Reset Zoom"
-				>
-					<svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-					</svg>
-					<span class="text-[9px] font-semibold uppercase tracking-wider">Reset Zoom</span>
-				</button>
+				{#if optimizedSvg}
+				<div class="bg-white/90 backdrop-blur text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-full shadow-sm border border-white/50 text-emerald-700 uppercase tracking-wider flex items-center gap-2">
+					<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+					Optimized ({formatBytes(optimizedSize)})
+					<span class="text-emerald-500/70 ml-1">-{Math.round((1 - optimizedSize/svgSize)*100)}%</span>
+				</div>
 				{/if}
 			</div>
-		</div>
-		{/if}
 
-	</div>
+			<!-- Options Popover -->
+			{#if showOptions}
+			<div class="absolute bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-white/95 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white p-6 z-40 animate-in slide-in-from-bottom-4 fade-in duration-200">
+				<div class="flex items-center justify-between mb-6">
+					<h3 class="text-lg font-bold text-gray-900 tracking-tight">Trace Settings</h3>
+					<button onclick={() => showOptions = false} class="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors" aria-label="Close options">
+						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+				</div>
+				
+				<div class="space-y-6">
+					<div class="space-y-3">
+						<div class="flex justify-between items-center">
+							<label for="ltres" class="text-sm font-semibold text-gray-700">Detail Level</label>
+							<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{ltres}</span>
+						</div>
+						<input id="ltres" type="range" min="0.1" max="5" step="0.1" bind:value={ltres} onchange={trace} class="w-full accent-black" />
+					</div>
+					
+					<div class="space-y-3">
+						<div class="flex justify-between items-center">
+							<label for="qtres" class="text-sm font-semibold text-gray-700">Smoothness</label>
+							<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{qtres}</span>
+						</div>
+						<input id="qtres" type="range" min="0.1" max="5" step="0.1" bind:value={qtres} onchange={trace} class="w-full accent-black" />
+					</div>
+
+					<div class="space-y-3">
+						<div class="flex justify-between items-center">
+							<label for="pathomit" class="text-sm font-semibold text-gray-700">Noise Removal</label>
+							<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{pathomit}</span>
+						</div>
+						<input id="pathomit" type="range" min="0" max="64" step="1" bind:value={pathomit} onchange={trace} class="w-full accent-black" />
+					</div>
+				</div>
+			</div>
+			{/if}
+
+			<!-- Floating Dock -->
+			<div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-300">
+				<div class="bg-black/90 backdrop-blur-xl shadow-2xl border border-white/10 rounded-full px-2 py-1.5 flex items-center gap-1 sm:gap-2">
+					
+					<!-- New Image -->
+					<button 
+						onclick={() => fileInput.click()}
+						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+					>
+						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+						</svg>
+						<span class="text-[8px] font-bold uppercase tracking-widest">New</span>
+					</button>
+
+					<div class="w-px h-6 bg-white/20"></div>
+
+					<!-- Options Toggle -->
+					<button 
+						onclick={() => showOptions = !showOptions}
+						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full transition-colors {showOptions ? 'text-white bg-white/20' : 'text-gray-400 hover:text-white hover:bg-white/10'}"
+					>
+						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+						</svg>
+						<span class="text-[8px] font-bold uppercase tracking-widest">Settings</span>
+					</button>
+
+					{#if originalSvg}
+					<div class="w-px h-6 bg-white/20"></div>
+
+					<!-- Optimize -->
+					<button 
+						onclick={optimizeSvg}
+						disabled={isOptimizing || optimizedSvg !== null}
+						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full transition-colors disabled:opacity-50 {optimizedSvg ? 'text-emerald-400' : 'text-gray-400 hover:text-emerald-300 hover:bg-emerald-400/10'}"
+					>
+						{#if isOptimizing}
+						<svg class="animate-spin w-4 h-4 mb-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						{:else}
+						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+						</svg>
+						{/if}
+						<span class="text-[8px] font-bold uppercase tracking-widest">Optimize</span>
+					</button>
+
+					<div class="w-px h-6 bg-white/20"></div>
+
+					<!-- Reset Zoom -->
+					<button 
+						onclick={() => { panX = 0; panY = 0; zoomLevel = 1; }}
+						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+					>
+						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+						</svg>
+						<span class="text-[8px] font-bold uppercase tracking-widest">Reset View</span>
+					</button>
+					
+					<div class="w-px h-6 bg-white/20"></div>
+
+					<!-- Download -->
+					<button 
+						onclick={downloadActive}
+						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 transition-colors"
+					>
+						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+						</svg>
+						<span class="text-[8px] font-bold uppercase tracking-widest">Download</span>
+					</button>
+					{/if}
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
