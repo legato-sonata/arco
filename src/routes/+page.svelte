@@ -268,7 +268,7 @@
 	}
 </script>
 
-<div class="h-screen w-full bg-gray-50 text-black font-sans selection:bg-gray-200 overflow-hidden flex flex-col">
+<div class="h-[100dvh] w-full bg-gray-50 text-black font-sans selection:bg-gray-200 overflow-hidden flex flex-col">
 	<input 
 		type="file" 
 		accept="image/png, image/jpeg" 
@@ -413,7 +413,7 @@
 
 			<!-- Options Popover -->
 			{#if showOptions}
-			<div class="absolute bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-white/95 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white p-6 z-40 animate-in slide-in-from-bottom-4 fade-in duration-200">
+			<div class="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-white/95 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white p-6 z-40 animate-in slide-in-from-bottom-4 fade-in duration-200">
 				<div class="flex items-center justify-between mb-6">
 					<h3 class="text-lg font-bold text-gray-900 tracking-tight">Trace Settings</h3>
 					<button onclick={() => showOptions = false} class="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors" aria-label="Close options">
@@ -452,7 +452,7 @@
 			{/if}
 
 			<!-- Floating Dock -->
-			<div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-300">
+			<div class="fixed bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-300">
 				<div class="bg-black/90 backdrop-blur-xl shadow-2xl border border-white/10 rounded-full px-2 py-1.5 flex items-center gap-1 sm:gap-2">
 					
 					<!-- New Image -->
