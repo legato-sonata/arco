@@ -369,7 +369,7 @@
 
 			<!-- Loading Overlay -->
 			{#if isConverting || isOptimizing}
-			<div class="absolute inset-0 bg-white/40 backdrop-blur-sm z-30 flex items-center justify-center pointer-events-none transition-opacity duration-300">
+			<div class="fixed inset-0 bg-white/40 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none transition-opacity duration-300">
 				<div class="bg-black text-white px-6 py-3 rounded-2xl flex items-center gap-3 shadow-2xl text-sm font-semibold">
 					<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -413,7 +413,12 @@
 
 			<!-- Options Popover -->
 			{#if showOptions}
-			<div class="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-white/95 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white p-6 z-40 animate-in slide-in-from-bottom-4 fade-in duration-200">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div 
+				onpointerdown={(e) => e.stopPropagation()}
+				onpointermove={(e) => e.stopPropagation()}
+				class="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-white/95 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white p-6 z-40 animate-in slide-in-from-bottom-4 fade-in duration-200"
+			>
 				<div class="flex items-center justify-between mb-6">
 					<h3 class="text-lg font-bold text-gray-900 tracking-tight">Trace Settings</h3>
 					<button onclick={() => showOptions = false} class="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors" aria-label="Close options">
@@ -452,18 +457,23 @@
 			{/if}
 
 			<!-- Floating Dock -->
-			<div class="fixed bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-300">
-				<div class="bg-black/90 backdrop-blur-xl shadow-2xl border border-white/10 rounded-full px-2 py-1.5 flex items-center gap-1 sm:gap-2">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div 
+				onpointerdown={(e) => e.stopPropagation()}
+				onpointermove={(e) => e.stopPropagation()}
+				class="fixed bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-300"
+			>
+				<div class="bg-black/90 backdrop-blur-xl shadow-2xl border border-white/10 rounded-full px-1.5 py-1.5 flex items-center gap-0.5 sm:gap-2">
 					
 					<!-- New Image -->
 					<button 
 						onclick={() => fileInput.click()}
-						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+						class="flex flex-col items-center justify-center px-2 min-w-[48px] sm:min-w-[56px] h-12 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
 					>
 						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
 						</svg>
-						<span class="text-[8px] font-bold uppercase tracking-widest">New</span>
+						<span class="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider">New</span>
 					</button>
 
 					<div class="w-px h-6 bg-white/20"></div>
@@ -471,12 +481,12 @@
 					<!-- Options Toggle -->
 					<button 
 						onclick={() => showOptions = !showOptions}
-						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full transition-colors {showOptions ? 'text-white bg-white/20' : 'text-gray-400 hover:text-white hover:bg-white/10'}"
+						class="flex flex-col items-center justify-center px-2 min-w-[48px] sm:min-w-[56px] h-12 rounded-full transition-colors {showOptions ? 'text-white bg-white/20' : 'text-gray-400 hover:text-white hover:bg-white/10'}"
 					>
 						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
 						</svg>
-						<span class="text-[8px] font-bold uppercase tracking-widest">Settings</span>
+						<span class="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider">Settings</span>
 					</button>
 
 					{#if originalSvg}
@@ -486,7 +496,7 @@
 					<button 
 						onclick={optimizeSvg}
 						disabled={isOptimizing || optimizedSvg !== null}
-						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full transition-all disabled:opacity-50 {optimizedSvg ? 'text-emerald-400' : 'text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30'}"
+						class="flex flex-col items-center justify-center px-2 min-w-[48px] sm:min-w-[56px] h-12 rounded-full transition-all disabled:opacity-50 {optimizedSvg ? 'text-emerald-400' : 'text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30'}"
 					>
 						{#if isOptimizing}
 						<svg class="animate-spin w-4 h-4 mb-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -498,7 +508,7 @@
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
 						</svg>
 						{/if}
-						<span class="text-[8px] font-bold uppercase tracking-widest">Optimize</span>
+						<span class="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider">Optimize</span>
 					</button>
 
 					<div class="w-px h-6 bg-white/20"></div>
@@ -506,12 +516,12 @@
 					<!-- Reset Zoom -->
 					<button 
 						onclick={() => { panX = 0; panY = 0; zoomLevel = 1; }}
-						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+						class="flex flex-col items-center justify-center px-2 min-w-[48px] sm:min-w-[56px] h-12 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
 					>
 						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
 						</svg>
-						<span class="text-[8px] font-bold uppercase tracking-widest">Reset View</span>
+						<span class="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider">Reset</span>
 					</button>
 					
 					<div class="w-px h-6 bg-white/20"></div>
@@ -519,12 +529,12 @@
 					<!-- Download -->
 					<button 
 						onclick={downloadActive}
-						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 transition-colors"
+						class="flex flex-col items-center justify-center px-2 min-w-[48px] sm:min-w-[56px] h-12 rounded-full text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 transition-colors"
 					>
 						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 						</svg>
-						<span class="text-[8px] font-bold uppercase tracking-widest">Download</span>
+						<span class="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider">Download</span>
 					</button>
 					{/if}
 				</div>
