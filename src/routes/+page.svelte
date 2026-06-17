@@ -51,6 +51,10 @@
 		return Math.hypot(p2.x - p1.x, p2.y - p1.y);
 	}
 
+	function getMidpoint(p1: { x: number; y: number }, p2: { x: number; y: number }) {
+		return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+	}
+
 	function onPointerDown(e: PointerEvent) {
 		activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		(e.target as Element)?.setPointerCapture(e.pointerId);
@@ -123,6 +127,24 @@
 
 	function onPointerLeave(e: PointerEvent) {
 		onPointerUp(e);
+	}
+
+	function onWheel(e: WheelEvent) {
+		if (!originalSvg) return;
+		e.preventDefault();
+		const scaleDelta = e.deltaY > 0 ? 0.9 : 1.1;
+		const newZoom = Math.max(0.1, Math.min(5, zoomLevel * scaleDelta));
+		
+		const rect = viewerContainer!.getBoundingClientRect();
+		const currentMidX = e.clientX - rect.left;
+		const currentMidY = e.clientY - rect.top;
+		
+		const imageX = (currentMidX - panX) / zoomLevel;
+		const imageY = (currentMidY - panY) / zoomLevel;
+		
+		panX = currentMidX - (imageX * newZoom);
+		panY = currentMidY - (imageY * newZoom);
+		zoomLevel = newZoom;
 	}
 
 	function onPointerDownSplit(e: PointerEvent) {
@@ -346,6 +368,7 @@
 			onpointerup={onPointerUp}
 			onpointercancel={onPointerUp}
 			onpointerleave={onPointerLeave}
+			onwheel={onWheel}
 		>
 			
 			<!-- Canvas Content -->
