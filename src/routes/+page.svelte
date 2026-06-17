@@ -832,11 +832,11 @@
 	<!-- Crop UI Overlay -->
 	{#if isCropping && rasterDataUrl && masterImgd}
 	<div class="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center animate-in fade-in duration-200">
-		<div class="flex-none h-16 sm:h-24 flex items-center justify-center">
+		<div class="relative z-10 flex-none h-16 sm:h-24 flex items-center justify-center pointer-events-none">
 			<div class="text-white font-bold text-lg tracking-wider">Crop Image</div>
 		</div>
 		
-		<div class="flex-1 w-[95vw] md:w-[80vw] flex items-center justify-center p-2 min-h-0">
+		<div class="flex-1 w-[95vw] md:w-[80vw] flex items-center justify-center p-2 min-h-0 relative z-0">
 			<div id="crop-container" class="relative max-w-full max-h-full" style="aspect-ratio: {masterImgd.width}/{masterImgd.height}; height: 100%;">
 				<!-- svelte-ignore a11y_missing_attribute -->
 				<img src={rasterDataUrl} class="w-full h-full object-contain block pointer-events-none opacity-50" />
@@ -886,7 +886,7 @@
 			</div>
 		</div>
 		
-		<div class="flex-none h-24 sm:h-32 flex items-center justify-center gap-3 sm:gap-4">
+		<div class="relative z-10 flex-none h-24 sm:h-32 flex items-center justify-center gap-3 sm:gap-4">
 			<button class="px-6 py-2.5 sm:px-8 sm:py-3 text-sm sm:text-base bg-white/10 hover:bg-white/20 text-white font-bold rounded-full transition-colors" onclick={() => isCropping = false}>Cancel</button>
 			<button class="px-6 py-2.5 sm:px-8 sm:py-3 text-sm sm:text-base bg-white text-black font-bold rounded-full transition-colors hover:bg-gray-100 shadow-lg" onclick={applyCrop}>Apply Crop</button>
 		</div>
