@@ -38,8 +38,22 @@
 
 	let selectedFile: File | null = $state(null);
 	let rasterDataUrl: string | null = $state(null);
+	let masterImgd: ImageData | null = null;
 	let originalImgd: ImageData | null = null;
 	let originalSize = $state(0);
+
+	let isCropping = $state(false);
+	let cropX = $state(0);
+	let cropY = $state(0);
+	let cropW = $state(1);
+	let cropH = $state(1);
+	let cropDragMode: 'none' | 'box' | 'tl' | 'tr' | 'bl' | 'br' | 't' | 'b' | 'l' | 'r' = $state('none');
+	let cropStartX = 0;
+	let cropStartY = 0;
+	let initialCropX = 0;
+	let initialCropY = 0;
+	let initialCropW = 0;
+	let initialCropH = 0;
 
 	let preBw = $state(false);
 	let preThreshold = $state(128);
@@ -76,6 +90,100 @@
 	
 	function onSliderChange() {
 		activePreset = 'custom';
+		trace();
+	}
+
+	function onCropPointerDown(e: PointerEvent, mode: typeof cropDragMode) {
+		e.stopPropagation();
+		e.preventDefault();
+		cropDragMode = mode;
+		cropStartX = e.clientX;
+		cropStartY = e.clientY;
+		initialCropX = cropX;
+		initialCropY = cropY;
+		initialCropW = cropW;
+		initialCropH = cropH;
+		window.addEventListener('pointermove', onCropPointerMove);
+		window.addEventListener('pointerup', onCropPointerUp);
+	}
+
+	function onCropPointerMove(e: PointerEvent) {
+		if (cropDragMode === 'none') return;
+		e.preventDefault();
+		const container = document.getElementById('crop-container');
+		if (!container) return;
+		const rect = container.getBoundingClientRect();
+		const dx = (e.clientX - cropStartX) / rect.width;
+		const dy = (e.clientY - cropStartY) / rect.height;
+
+		if (cropDragMode === 'box') {
+			cropX = Math.max(0, Math.min(1 - cropW, initialCropX + dx));
+			cropY = Math.max(0, Math.min(1 - cropH, initialCropY + dy));
+		} else {
+			let newX = initialCropX;
+			let newY = initialCropY;
+			let newW = initialCropW;
+			let newH = initialCropH;
+
+			if (cropDragMode.includes('l')) {
+				newX = Math.max(0, Math.min(initialCropX + initialCropW - 0.05, initialCropX + dx));
+				newW = initialCropX + initialCropW - newX;
+			}
+			if (cropDragMode.includes('r')) {
+				newW = Math.max(0.05, Math.min(1 - initialCropX, initialCropW + dx));
+			}
+			if (cropDragMode.includes('t')) {
+				newY = Math.max(0, Math.min(initialCropY + initialCropH - 0.05, initialCropY + dy));
+				newH = initialCropY + initialCropH - newY;
+			}
+			if (cropDragMode.includes('b')) {
+				newH = Math.max(0.05, Math.min(1 - initialCropY, initialCropH + dy));
+			}
+
+			cropX = newX;
+			cropY = newY;
+			cropW = newW;
+			cropH = newH;
+		}
+	}
+
+	function onCropPointerUp() {
+		cropDragMode = 'none';
+		window.removeEventListener('pointermove', onCropPointerMove);
+		window.removeEventListener('pointerup', onCropPointerUp);
+	}
+
+	function applyCrop() {
+		if (!masterImgd) return;
+		const sx = Math.floor(cropX * masterImgd.width);
+		const sy = Math.floor(cropY * masterImgd.height);
+		const ex = Math.min(masterImgd.width, Math.floor((cropX + cropW) * masterImgd.width));
+		const ey = Math.min(masterImgd.height, Math.floor((cropY + cropH) * masterImgd.height));
+		const sw = ex - sx;
+		const sh = ey - sy;
+
+		if (sw <= 0 || sh <= 0) {
+			isCropping = false;
+			return;
+		}
+
+		const canvas = document.createElement('canvas');
+		canvas.width = sw;
+		canvas.height = sh;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		
+		const tempCanvas = document.createElement('canvas');
+		tempCanvas.width = masterImgd.width;
+		tempCanvas.height = masterImgd.height;
+		const tempCtx = tempCanvas.getContext('2d');
+		if (tempCtx) {
+			tempCtx.putImageData(masterImgd, 0, 0);
+			ctx.drawImage(tempCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+			originalImgd = ctx.getImageData(0, 0, sw, sh);
+		}
+		
+		isCropping = false;
 		trace();
 	}
 
@@ -280,7 +388,9 @@
 				const ctx = canvas.getContext('2d');
 				if (ctx) {
 					ctx.drawImage(img, 0, 0);
-					originalImgd = ctx.getImageData(0, 0, canvas.width, canvas.height);
+					masterImgd = ctx.getImageData(0, 0, canvas.width, canvas.height);
+					originalImgd = masterImgd;
+					cropX = 0; cropY = 0; cropW = 1; cropH = 1;
 				}
 				await tick();
 				trace();
@@ -642,6 +752,19 @@
 
 					<div class="w-px h-6 bg-white/20"></div>
 
+					<!-- Crop -->
+					<button 
+						onclick={() => isCropping = true}
+						class="flex flex-col items-center justify-center px-2 min-w-[48px] sm:min-w-[56px] h-12 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+					>
+						<svg class="w-4 h-4 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6H5a2 2 0 00-2 2v3m18 5v3a2 2 0 01-2 2h-3m-5-18h3a2 2 0 012 2v3M3 16v-3a2 2 0 012-2h3" />
+						</svg>
+						<span class="text-[7px] sm:text-[8px] font-bold uppercase tracking-wider">Crop</span>
+					</button>
+
+					<div class="w-px h-6 bg-white/20"></div>
+
 					<!-- Options Toggle -->
 					<button 
 						onclick={() => showOptions = !showOptions}
@@ -704,5 +827,66 @@
 				</div>
 			</div>
 		</div>
+	{/if}
+
+	<!-- Crop UI Overlay -->
+	{#if isCropping && rasterDataUrl && masterImgd}
+	<div class="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-200">
+		<div class="absolute top-8 text-white font-bold text-lg tracking-wider">Crop Image</div>
+		
+		<div class="relative w-[90vw] h-[70vh] flex items-center justify-center p-4">
+			<div id="crop-container" class="relative max-w-full max-h-full" style="aspect-ratio: {masterImgd.width}/{masterImgd.height}; height: 100%;">
+				<!-- svelte-ignore a11y_missing_attribute -->
+				<img src={rasterDataUrl} class="w-full h-full object-contain block pointer-events-none opacity-50" />
+				
+				<div 
+					class="absolute border-2 border-white cursor-move touch-none overflow-hidden"
+					style="left: {cropX * 100}%; top: {cropY * 100}%; width: {cropW * 100}%; height: {cropH * 100}%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"
+					onpointerdown={(e) => onCropPointerDown(e, 'box')}
+				>
+					<!-- svelte-ignore a11y_missing_attribute -->
+					<img src={rasterDataUrl} class="absolute max-w-none pointer-events-none" style="left: {-cropX * 100 / cropW}%; top: {-cropY * 100 / cropH}%; width: {100 / cropW}%; height: {100 / cropH}%;" />
+					
+					<!-- Grid Lines -->
+					<div class="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
+						<div class="border-b border-r border-white/30"></div>
+						<div class="border-b border-r border-white/30"></div>
+						<div class="border-b border-white/30"></div>
+						<div class="border-b border-r border-white/30"></div>
+						<div class="border-b border-r border-white/30"></div>
+						<div class="border-b border-white/30"></div>
+						<div class="border-r border-white/30"></div>
+						<div class="border-r border-white/30"></div>
+						<div></div>
+					</div>
+					
+					<!-- Handles -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute -top-3 -left-3 w-6 h-6 bg-white rounded-full shadow cursor-nwse-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'tl')}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute -top-3 -right-3 w-6 h-6 bg-white rounded-full shadow cursor-nesw-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'tr')}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute -bottom-3 -left-3 w-6 h-6 bg-white rounded-full shadow cursor-nesw-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'bl')}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute -bottom-3 -right-3 w-6 h-6 bg-white rounded-full shadow cursor-nwse-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'br')}></div>
+					
+					<!-- Edges -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute top-0 left-0 right-0 h-4 -translate-y-2 cursor-ns-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 't')}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute bottom-0 left-0 right-0 h-4 translate-y-2 cursor-ns-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'b')}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute top-0 bottom-0 left-0 w-4 -translate-x-2 cursor-ew-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'l')}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute top-0 bottom-0 right-0 w-4 translate-x-2 cursor-ew-resize touch-none" onpointerdown={(e) => onCropPointerDown(e, 'r')}></div>
+				</div>
+			</div>
+		</div>
+		
+		<div class="absolute bottom-12 flex gap-4">
+			<button class="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-full transition-colors" onclick={() => isCropping = false}>Cancel</button>
+			<button class="px-8 py-3 bg-white text-black font-bold rounded-full transition-colors hover:bg-gray-100 shadow-lg" onclick={applyCrop}>Apply Crop</button>
+		</div>
+	</div>
 	{/if}
 </div>
