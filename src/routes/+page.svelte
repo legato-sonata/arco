@@ -136,11 +136,13 @@
 	}
 
 	function onPointerDownSplit(e: PointerEvent) {
+		e.stopPropagation();
 		isDraggingSplit = true;
 		(e.target as Element)?.setPointerCapture(e.pointerId);
 	}
 
 	function onPointerMoveSplit(e: PointerEvent) {
+		e.stopPropagation();
 		if (!isDraggingSplit || !viewerContainer) return;
 		const rect = viewerContainer.getBoundingClientRect();
 		let newPos = ((e.clientX - rect.left) / rect.width) * 100;
@@ -148,6 +150,7 @@
 	}
 
 	function onPointerUpSplit(e: PointerEvent) {
+		e.stopPropagation();
 		isDraggingSplit = false;
 		(e.target as Element)?.releasePointerCapture(e.pointerId);
 	}
