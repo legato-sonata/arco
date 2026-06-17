@@ -203,7 +203,6 @@
 		originalSize = file.size;
 		originalSvg = null;
 		optimizedSvg = null;
-		isConverting = true;
 		
 		panX = 0;
 		panY = 0;
