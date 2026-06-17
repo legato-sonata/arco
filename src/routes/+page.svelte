@@ -38,8 +38,48 @@
 
 	let selectedFile: File | null = $state(null);
 	let rasterDataUrl: string | null = $state(null);
+	let originalImgd: ImageData | null = null;
 	let rasterImgd: ImageData | null = null;
 	let originalSize = $state(0);
+
+	let preBw = $state(false);
+	let preThreshold = $state(128);
+	let preInvert = $state(false);
+
+	function applyFilters() {
+		if (!originalImgd) return;
+		const data = new Uint8ClampedArray(originalImgd.data);
+		
+		if (preBw || preInvert) {
+			for (let i = 0; i < data.length; i += 4) {
+				let r = data[i];
+				let g = data[i+1];
+				let b = data[i+2];
+				
+				if (preBw) {
+					const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+					const val = lum >= preThreshold ? 255 : 0;
+					r = val; g = val; b = val;
+				}
+				
+				if (preInvert) {
+					r = 255 - r;
+					g = 255 - g;
+					b = 255 - b;
+				}
+				
+				data[i] = r;
+				data[i+1] = g;
+				data[i+2] = b;
+			}
+		}
+		rasterImgd = new ImageData(data, originalImgd.width, originalImgd.height);
+	}
+
+	function onPreprocessChange() {
+		applyFilters();
+		trace();
+	}
 	
 	let originalSvg: string | null = $state(null);
 	let svgSize = $state(0);
@@ -274,7 +314,8 @@
 				const ctx = canvas.getContext('2d');
 				if (ctx) {
 					ctx.drawImage(img, 0, 0);
-					rasterImgd = ctx.getImageData(0, 0, canvas.width, canvas.height);
+					originalImgd = ctx.getImageData(0, 0, canvas.width, canvas.height);
+					applyFilters();
 				}
 				await tick();
 				trace();
@@ -540,6 +581,31 @@
 				</div>
 				
 				<div class="space-y-6">
+					<!-- Preprocessing -->
+					<div class="space-y-4">
+						<span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Preprocessing</span>
+						
+						<div class="space-y-3">
+							<div class="flex items-center justify-between">
+								<label for="preBw" class="text-sm font-semibold text-gray-700">Black & White (Threshold)</label>
+								<input id="preBw" type="checkbox" bind:checked={preBw} onchange={onPreprocessChange} class="w-4 h-4 accent-black rounded" />
+							</div>
+							{#if preBw}
+								<div class="flex gap-2 items-center">
+									<input type="range" min="1" max="254" step="1" bind:value={preThreshold} onchange={onPreprocessChange} class="flex-1 accent-black" />
+									<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{preThreshold}</span>
+								</div>
+							{/if}
+						</div>
+
+						<div class="flex items-center justify-between">
+							<label for="preInvert" class="text-sm font-semibold text-gray-700">Invert Colors</label>
+							<input id="preInvert" type="checkbox" bind:checked={preInvert} onchange={onPreprocessChange} class="w-4 h-4 accent-black rounded" />
+						</div>
+					</div>
+
+					<hr class="border-gray-200" />
+
 					<!-- Presets -->
 					<div class="space-y-2">
 						<span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Presets</span>
