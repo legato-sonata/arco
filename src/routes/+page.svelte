@@ -47,9 +47,11 @@
 	
 	let originalSvg: string | null = $state(null);
 	let svgSize = $state(0);
+	let originalNodeCount = $state(0);
 	
 	let optimizedSvg: string | null = $state(null);
 	let optimizedSize = $state(0);
+	let optimizedNodeCount = $state(0);
 
 	let activePreset = $state('low');
 	let ltres = $state(5);
@@ -316,6 +318,7 @@
 			if (rawSvg) {
 				originalSvg = fixSvgForZoom(rawSvg as string);
 				svgSize = new Blob([originalSvg]).size;
+				originalNodeCount = (originalSvg.match(/<path/g) || []).length;
 			}
 		} catch (error) {
 			console.error("Tracing error:", error);
@@ -352,6 +355,7 @@
 
 			optimizedSvg = optimizedRaw as string;
 			optimizedSize = new Blob([optimizedSvg]).size;
+			optimizedNodeCount = (optimizedSvg.match(/<path/g) || []).length;
 		} catch (error) {
 			console.error("Optimization error:", error);
 			alert("An error occurred during optimization.");
@@ -518,6 +522,7 @@
 				<div class="bg-white/90 backdrop-blur text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-full shadow-sm border border-white/50 text-gray-700 uppercase tracking-wider flex items-center gap-2">
 					<span class="w-2 h-2 rounded-full bg-blue-500"></span>
 					Raw SVG ({formatBytes(svgSize)})
+					<span class="text-[9px] font-mono text-gray-500 normal-case ml-1">{originalNodeCount} paths</span>
 				</div>
 				{/if}
 				{#if optimizedSvg}
@@ -525,6 +530,7 @@
 					<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
 					Optimized ({formatBytes(optimizedSize)})
 					<span class="text-emerald-500/70 ml-1">-{Math.round((1 - optimizedSize/svgSize)*100)}%</span>
+					<span class="text-[9px] font-mono text-emerald-600/70 normal-case ml-1">{optimizedNodeCount} paths (-{originalNodeCount - optimizedNodeCount})</span>
 				</div>
 				{/if}
 			</div>
