@@ -319,7 +319,7 @@
 	}
 </script>
 
-<div class="min-h-screen bg-white text-black font-sans selection:bg-gray-200">
+<div class="min-h-screen bg-white text-black font-sans selection:bg-gray-200 pb-32 relative">
 	<div class="max-w-4xl mx-auto px-4 py-8 md:py-16 space-y-12">
 		<!-- Header -->
 		<header class="text-center space-y-3">
@@ -580,5 +580,73 @@
 			{/if}
 
 		</main>
+
+		<!-- Floating Action Dock -->
+		{#if rasterDataUrl}
+		<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-300">
+			<div class="bg-black/90 backdrop-blur-md shadow-2xl border border-gray-800 rounded-full px-2 py-2 flex items-center gap-2">
+				<!-- New Image -->
+				<button 
+					onclick={() => fileInput.click()}
+					class="flex flex-col items-center justify-center w-16 h-14 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+					title="Upload New Image"
+				>
+					<svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+					</svg>
+					<span class="text-[9px] font-semibold uppercase tracking-wider">New</span>
+				</button>
+
+				<div class="w-px h-8 bg-gray-700"></div>
+
+				<!-- Settings -->
+				<button 
+					onclick={() => optionsSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+					class="flex flex-col items-center justify-center w-16 h-14 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+					title="Adjust Settings"
+				>
+					<svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+					</svg>
+					<span class="text-[9px] font-semibold uppercase tracking-wider">Settings</span>
+				</button>
+
+				{#if originalSvg}
+				<div class="w-px h-8 bg-gray-700"></div>
+
+				<!-- View Result -->
+				<button 
+					onclick={() => resultSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+					class="flex flex-col items-center justify-center w-16 h-14 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+					title="View Result"
+				>
+					<svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+					</svg>
+					<span class="text-[9px] font-semibold uppercase tracking-wider">Result</span>
+				</button>
+
+				<div class="w-px h-8 bg-gray-700"></div>
+
+				<!-- Reset Zoom -->
+				<button 
+					onclick={() => {
+						panX = 0; panY = 0; zoomLevel = 1;
+						resultSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+					}}
+					class="flex flex-col items-center justify-center w-16 h-14 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+					title="Reset Zoom"
+				>
+					<svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+					</svg>
+					<span class="text-[9px] font-semibold uppercase tracking-wider">Reset</span>
+				</button>
+				{/if}
+			</div>
+		</div>
+		{/if}
+
 	</div>
 </div>
