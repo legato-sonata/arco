@@ -569,23 +569,23 @@
 			<div 
 				onpointerdown={(e) => e.stopPropagation()}
 				onpointermove={(e) => e.stopPropagation()}
-				class="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-white/95 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white p-6 z-40 animate-in slide-in-from-bottom-4 fade-in duration-200"
+				class="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-white/95 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white p-5 z-40 animate-in slide-in-from-bottom-4 fade-in duration-200"
 			>
-				<div class="flex items-center justify-between mb-6">
+				<div class="flex items-center justify-between mb-4">
 					<h3 class="text-lg font-bold text-gray-900 tracking-tight">Trace Settings</h3>
-					<button onclick={() => showOptions = false} class="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors" aria-label="Close options">
+					<button onclick={() => showOptions = false} class="p-1.5 hover:bg-gray-100 rounded-full text-gray-500 transition-colors" aria-label="Close options">
 						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 						</svg>
 					</button>
 				</div>
 				
-				<div class="space-y-6">
+				<div class="space-y-5 max-h-[55vh] overflow-y-auto pr-2 pb-2">
 					<!-- Preprocessing -->
-					<div class="space-y-4">
+					<div class="space-y-3">
 						<span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Preprocessing</span>
 						
-						<div class="space-y-3">
+						<div class="space-y-2">
 							<div class="flex items-center justify-between">
 								<label for="preBw" class="text-sm font-semibold text-gray-700">Black & White (Threshold)</label>
 								<input id="preBw" type="checkbox" bind:checked={preBw} onchange={onPreprocessChange} class="w-4 h-4 accent-black rounded" />
@@ -612,7 +612,7 @@
 						<div class="grid grid-cols-2 md:grid-cols-4 gap-2">
 							{#each Object.entries(presets) as [key, preset]}
 								<button 
-									class="px-2 py-1.5 text-xs font-medium rounded-lg border transition-colors {activePreset === key ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}"
+									class="px-2 py-1.5 text-[11px] font-medium rounded-lg border transition-colors {activePreset === key ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}"
 									onclick={() => applyPreset(key as keyof typeof presets)}
 								>
 									{preset.label}
@@ -621,7 +621,7 @@
 						</div>
 					</div>
 
-					<div class="space-y-3">
+					<div class="space-y-2">
 						<div class="flex justify-between items-center">
 							<label for="ltres" class="text-sm font-semibold text-gray-700">Detail Level</label>
 							<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{ltres}</span>
@@ -629,7 +629,7 @@
 						<input id="ltres" type="range" min="0.1" max="10" step="0.1" bind:value={ltres} onchange={onSliderChange} class="w-full accent-black" />
 					</div>
 					
-					<div class="space-y-3">
+					<div class="space-y-2">
 						<div class="flex justify-between items-center">
 							<label for="qtres" class="text-sm font-semibold text-gray-700">Smoothness</label>
 							<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{qtres}</span>
@@ -637,7 +637,7 @@
 						<input id="qtres" type="range" min="0.1" max="10" step="0.1" bind:value={qtres} onchange={onSliderChange} class="w-full accent-black" />
 					</div>
 
-					<div class="space-y-3">
+					<div class="space-y-2">
 						<div class="flex justify-between items-center">
 							<label for="pathomit" class="text-sm font-semibold text-gray-700">Noise Removal</label>
 							<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{pathomit}</span>
