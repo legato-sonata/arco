@@ -37,6 +37,12 @@
 	let initialPinchDistance = $state<number | null>(null);
 	let initialZoomLevel = $state(1);
 	let isPinching = $state(false);
+	
+	// Pinch focal point state
+	let initialPanX = $state(0);
+	let initialPanY = $state(0);
+	let initialMidX = $state(0);
+	let initialMidY = $state(0);
 
 	let splitPos = $state(50);
 	let isDraggingSplit = $state(false);
@@ -60,6 +66,13 @@
 			const pts = Array.from(activePointers.values());
 			initialPinchDistance = getDistance(pts[0], pts[1]);
 			initialZoomLevel = zoomLevel;
+			initialPanX = panX;
+			initialPanY = panY;
+			
+			const mid = getMidpoint(pts[0], pts[1]);
+			const rect = viewerContainer!.getBoundingClientRect();
+			initialMidX = mid.x - rect.left;
+			initialMidY = mid.y - rect.top;
 		}
 	}
 
@@ -71,7 +84,19 @@
 			const pts = Array.from(activePointers.values());
 			const currentDist = getDistance(pts[0], pts[1]);
 			const scaleDelta = currentDist / initialPinchDistance;
-			zoomLevel = Math.max(0.1, Math.min(5, initialZoomLevel * scaleDelta));
+			const newZoom = Math.max(0.1, Math.min(5, initialZoomLevel * scaleDelta));
+			
+			const currentMid = getMidpoint(pts[0], pts[1]);
+			const rect = viewerContainer!.getBoundingClientRect();
+			const currentMidX = currentMid.x - rect.left;
+			const currentMidY = currentMid.y - rect.top;
+			
+			const imageX = (initialMidX - initialPanX) / initialZoomLevel;
+			const imageY = (initialMidY - initialPanY) / initialZoomLevel;
+			
+			panX = currentMidX - (imageX * newZoom);
+			panY = currentMidY - (imageY * newZoom);
+			zoomLevel = newZoom;
 		} else if (isPanning && activePointers.size === 1) {
 			panX = e.clientX - startX;
 			panY = e.clientY - startY;
@@ -331,7 +356,7 @@
 			{:else}
 				<div class="absolute inset-0">
 					<!-- Base Layer (Optimized) -->
-					<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
+					<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
 						<div class="w-full h-full flex items-center justify-center pointer-events-none">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 							{@html optimizedSvg || originalSvg}
@@ -341,7 +366,7 @@
 					<!-- Clipped Layer (Raw) - Only show if optimized exists -->
 					{#if optimizedSvg}
 					<div class="absolute inset-0 pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:this={clipViewport}>
-						<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
+						<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
 							<div class="w-full h-full flex items-center justify-center pointer-events-none">
 								<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 								{@html originalSvg}
