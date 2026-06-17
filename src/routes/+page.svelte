@@ -229,7 +229,9 @@
 		isConverting = true;
 		optimizedSvg = null; // reset optimization if we re-trace
 		
-		await new Promise(r => setTimeout(r, 50));
+		// Yield to browser rendering pipeline twice, plus a small delay to ensure paint
+		await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+		await new Promise(r => setTimeout(r, 100));
 
 		try {
 			let rawSvg = await new Promise<string>((resolve) => {
@@ -267,7 +269,8 @@
 		if (!originalSvg) return;
 		isOptimizing = true;
 
-		await new Promise(r => setTimeout(r, 50));
+		await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+		await new Promise(r => setTimeout(r, 100));
 
 		try {
 			const result = optimize(originalSvg, {
@@ -309,9 +312,16 @@
 		URL.revokeObjectURL(url);
 	}
 	
+	function getDownloadFilename(type: 'raw' | 'optimized') {
+		const base = selectedFile ? selectedFile.name.replace(/\.[^/.]+$/, "") : 'arco';
+		const now = new Date();
+		const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+		return `${base}-${type}-${dateStr}.svg`;
+	}
+
 	function downloadActive() {
-		if (optimizedSvg) downloadFile(optimizedSvg as string, 'arco-optimized.svg');
-		else if (originalSvg) downloadFile(originalSvg as string, 'arco-raw.svg');
+		if (optimizedSvg) downloadFile(optimizedSvg as string, getDownloadFilename('optimized'));
+		else if (originalSvg) downloadFile(originalSvg as string, getDownloadFilename('raw'));
 	}
 </script>
 
