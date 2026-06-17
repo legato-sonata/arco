@@ -47,9 +47,31 @@
 	let optimizedSvg: string | null = $state(null);
 	let optimizedSize = $state(0);
 
-	let ltres = $state(1);
-	let qtres = $state(1);
-	let pathomit = $state(8);
+	let activePreset = $state('low');
+	let ltres = $state(5);
+	let qtres = $state(5);
+	let pathomit = $state(16);
+
+	const presets = {
+		'normal': { ltres: 0.1, qtres: 0.1, pathomit: 0, label: 'Normal' },
+		'medium': { ltres: 1, qtres: 1, pathomit: 8, label: 'Medium' },
+		'low': { ltres: 5, qtres: 5, pathomit: 16, label: 'Low' },
+		'super-low': { ltres: 10, qtres: 10, pathomit: 32, label: 'Super Low' }
+	};
+
+	function applyPreset(key: keyof typeof presets) {
+		activePreset = key;
+		const p = presets[key];
+		ltres = p.ltres;
+		qtres = p.qtres;
+		pathomit = p.pathomit;
+		trace();
+	}
+	
+	function onSliderChange() {
+		activePreset = 'custom';
+		trace();
+	}
 
 	let panX = $state(0);
 	let panY = $state(0);
@@ -518,12 +540,27 @@
 				</div>
 				
 				<div class="space-y-6">
+					<!-- Presets -->
+					<div class="space-y-2">
+						<label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Presets</label>
+						<div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+							{#each Object.entries(presets) as [key, preset]}
+								<button 
+									class="px-2 py-1.5 text-xs font-medium rounded-lg border transition-colors {activePreset === key ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}"
+									onclick={() => applyPreset(key as keyof typeof presets)}
+								>
+									{preset.label}
+								</button>
+							{/each}
+						</div>
+					</div>
+
 					<div class="space-y-3">
 						<div class="flex justify-between items-center">
 							<label for="ltres" class="text-sm font-semibold text-gray-700">Detail Level</label>
 							<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{ltres}</span>
 						</div>
-						<input id="ltres" type="range" min="0.1" max="5" step="0.1" bind:value={ltres} onchange={trace} class="w-full accent-black" />
+						<input id="ltres" type="range" min="0.1" max="10" step="0.1" bind:value={ltres} onchange={onSliderChange} class="w-full accent-black" />
 					</div>
 					
 					<div class="space-y-3">
@@ -531,7 +568,7 @@
 							<label for="qtres" class="text-sm font-semibold text-gray-700">Smoothness</label>
 							<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{qtres}</span>
 						</div>
-						<input id="qtres" type="range" min="0.1" max="5" step="0.1" bind:value={qtres} onchange={trace} class="w-full accent-black" />
+						<input id="qtres" type="range" min="0.1" max="10" step="0.1" bind:value={qtres} onchange={onSliderChange} class="w-full accent-black" />
 					</div>
 
 					<div class="space-y-3">
@@ -539,7 +576,7 @@
 							<label for="pathomit" class="text-sm font-semibold text-gray-700">Noise Removal</label>
 							<span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-md">{pathomit}</span>
 						</div>
-						<input id="pathomit" type="range" min="0" max="64" step="1" bind:value={pathomit} onchange={trace} class="w-full accent-black" />
+						<input id="pathomit" type="range" min="0" max="64" step="1" bind:value={pathomit} onchange={onSliderChange} class="w-full accent-black" />
 					</div>
 				</div>
 			</div>
