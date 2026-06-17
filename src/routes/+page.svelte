@@ -1,7 +1,31 @@
 <script lang="ts">
-	import { tick } from 'svelte';
-	import { optimize } from 'svgo/browser';
-	import ImageTracer from 'imagetracerjs';
+	import { tick, onMount } from 'svelte';
+
+	let worker: Worker | null = null;
+	const pendingJobs = new Map();
+	let nextJobId = 0;
+
+	onMount(async () => {
+		const WorkerModule = await import('$lib/worker?worker');
+		worker = new WorkerModule.default();
+		worker.onmessage = (e) => {
+			const { id, result, error } = e.data;
+			if (pendingJobs.has(id)) {
+				if (error) pendingJobs.get(id).reject(new Error(error));
+				else pendingJobs.get(id).resolve(result);
+				pendingJobs.delete(id);
+			}
+		};
+	});
+
+	function runWorkerJob(type: string, payload: any): Promise<any> {
+		return new Promise((resolve, reject) => {
+			if (!worker) return reject(new Error('Worker not initialized'));
+			const id = nextJobId++;
+			pendingJobs.set(id, { resolve, reject });
+			worker.postMessage({ id, type, payload });
+		});
+	}
 
 	let fileInput: HTMLInputElement;
 	let viewerContainer: HTMLDivElement | undefined = $state();
@@ -14,6 +38,7 @@
 
 	let selectedFile: File | null = $state(null);
 	let rasterDataUrl: string | null = $state(null);
+	let rasterImgd: ImageData | null = null;
 	let originalSize = $state(0);
 	
 	let originalSvg: string | null = $state(null);
@@ -218,43 +243,49 @@
 		const reader = new FileReader();
 		reader.onload = async (e) => {
 			rasterDataUrl = e.target?.result as string;
-			await tick();
-			trace();
+			
+			const img = new Image();
+			img.onload = async () => {
+				const canvas = document.createElement('canvas');
+				canvas.width = img.width;
+				canvas.height = img.height;
+				const ctx = canvas.getContext('2d');
+				if (ctx) {
+					ctx.drawImage(img, 0, 0);
+					rasterImgd = ctx.getImageData(0, 0, canvas.width, canvas.height);
+				}
+				await tick();
+				trace();
+			};
+			img.src = rasterDataUrl;
 		};
 		reader.readAsDataURL(file);
 	}
 
 	async function trace() {
-		if (!rasterDataUrl) return;
+		if (!rasterImgd || !worker) return;
 		isConverting = true;
 		optimizedSvg = null; // reset optimization if we re-trace
-		
-		// Yield to browser rendering pipeline twice, plus a small delay to ensure paint
-		await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-		await new Promise(r => setTimeout(r, 100));
 
 		try {
-			let rawSvg = await new Promise<string>((resolve) => {
-				ImageTracer.imageToSVG(
-					rasterDataUrl,
-					(svgstr: string) => resolve(svgstr),
-					{
-						ltres: ltres,
-						qtres: qtres,
-						pathomit: pathomit,
-						colorsampling: 0,
-						numberofcolors: 2,
-						mincolorratio: 0,
-						colorquantcycles: 1,
-						scale: 1,
-						simplifytolerance: 0,
-						roundcoords: 1,
-					}
-				);
+			const rawSvg = await runWorkerJob('trace', {
+				imgd: rasterImgd,
+				options: {
+					ltres: ltres,
+					qtres: qtres,
+					pathomit: pathomit,
+					colorsampling: 0,
+					numberofcolors: 2,
+					mincolorratio: 0,
+					colorquantcycles: 1,
+					scale: 1,
+					simplifytolerance: 0,
+					roundcoords: 1,
+				}
 			});
 
 			if (rawSvg) {
-				originalSvg = fixSvgForZoom(rawSvg);
+				originalSvg = fixSvgForZoom(rawSvg as string);
 				svgSize = new Blob([originalSvg]).size;
 			}
 		} catch (error) {
@@ -266,31 +297,31 @@
 	}
 
 	async function optimizeSvg() {
-		if (!originalSvg) return;
+		if (!originalSvg || !worker) return;
 		isOptimizing = true;
 
-		await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-		await new Promise(r => setTimeout(r, 100));
-
 		try {
-			const result = optimize(originalSvg, {
-				multipass: true,
-				floatPrecision: 1,
-				plugins: [
-					{
-						name: 'preset-default',
-						params: {
-							overrides: {
-								cleanupNumericValues: { floatPrecision: 1 },
-								convertPathData: { floatPrecision: 1, forceAbsolutePath: false, utilzeAbsolute: false },
-								removeViewBox: false
+			const optimizedRaw = await runWorkerJob('optimize', {
+				originalSvg,
+				options: {
+					multipass: true,
+					floatPrecision: 1,
+					plugins: [
+						{
+							name: 'preset-default',
+							params: {
+								overrides: {
+									cleanupNumericValues: { floatPrecision: 1 },
+									convertPathData: { floatPrecision: 1, forceAbsolutePath: false, utilzeAbsolute: false },
+									removeViewBox: false
+								}
 							}
 						}
-					}
-				]
+					]
+				}
 			});
 
-			optimizedSvg = fixSvgForZoom(result.data);
+			optimizedSvg = fixSvgForZoom(optimizedRaw as string);
 			optimizedSize = new Blob([optimizedSvg]).size;
 		} catch (error) {
 			console.error("Optimization error:", error);
