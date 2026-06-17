@@ -331,7 +331,7 @@
 			{:else}
 				<div class="absolute inset-0">
 					<!-- Base Layer (Optimized) -->
-					<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
+					<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
 						<div class="w-full h-full flex items-center justify-center pointer-events-none">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 							{@html optimizedSvg || originalSvg}
@@ -341,7 +341,7 @@
 					<!-- Clipped Layer (Raw) - Only show if optimized exists -->
 					{#if optimizedSvg}
 					<div class="absolute inset-0 pointer-events-none" style="clip-path: polygon(0 0, {splitPos}% 0, {splitPos}% 100%, 0 100%);" bind:this={clipViewport}>
-						<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); transform-origin: 0 0; {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
+						<div style="transform: translate({panX}px, {panY}px) scale({zoomLevel}); {isPinching || isPanning ? '' : 'transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);'}" class="w-full h-full flex items-center justify-center p-4">
 							<div class="w-full h-full flex items-center justify-center pointer-events-none">
 								<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 								{@html originalSvg}
@@ -486,7 +486,7 @@
 					<button 
 						onclick={optimizeSvg}
 						disabled={isOptimizing || optimizedSvg !== null}
-						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full transition-colors disabled:opacity-50 {optimizedSvg ? 'text-emerald-400' : 'text-gray-400 hover:text-emerald-300 hover:bg-emerald-400/10'}"
+						class="flex flex-col items-center justify-center px-3 min-w-[56px] h-12 rounded-full transition-all disabled:opacity-50 {optimizedSvg ? 'text-emerald-400' : 'text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30'}"
 					>
 						{#if isOptimizing}
 						<svg class="animate-spin w-4 h-4 mb-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
