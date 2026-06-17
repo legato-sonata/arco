@@ -542,7 +542,7 @@
 				<div class="space-y-6">
 					<!-- Presets -->
 					<div class="space-y-2">
-						<label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Presets</label>
+						<span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Presets</span>
 						<div class="grid grid-cols-2 md:grid-cols-4 gap-2">
 							{#each Object.entries(presets) as [key, preset]}
 								<button 
