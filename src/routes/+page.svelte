@@ -321,7 +321,7 @@
 				}
 			});
 
-			optimizedSvg = fixSvgForZoom(optimizedRaw as string);
+			optimizedSvg = optimizedRaw as string;
 			optimizedSize = new Blob([optimizedSvg]).size;
 		} catch (error) {
 			console.error("Optimization error:", error);
