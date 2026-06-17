@@ -1,8 +1,11 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { optimize } from 'svgo/browser';
 	import ImageTracer from 'imagetracerjs';
 
 	let fileInput: HTMLInputElement;
+	let optionsSection: HTMLElement | undefined = $state();
+	let resultSection: HTMLElement | undefined = $state();
 	let isDragging = $state(false);
 	let isConverting = $state(false);
 	let isOptimizing = $state(false);
@@ -212,8 +215,10 @@
 		zoomLevel = 1;
 
 		const reader = new FileReader();
-		reader.onload = (e) => {
+		reader.onload = async (e) => {
 			rasterDataUrl = e.target?.result as string;
+			await tick();
+			optionsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 		};
 		reader.readAsDataURL(file);
 	}
@@ -256,6 +261,10 @@
 			alert("An error occurred during tracing.");
 		} finally {
 			isConverting = false;
+			if (originalSvg) {
+				await tick();
+				resultSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			}
 		}
 	}
 
@@ -290,6 +299,10 @@
 			alert("An error occurred during optimization.");
 		} finally {
 			isOptimizing = false;
+			if (optimizedSvg) {
+				await tick();
+				resultSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			}
 		}
 	}
 
@@ -354,7 +367,7 @@
 
 			{#if rasterDataUrl}
 			<!-- Source Preview and Options -->
-			<section class="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500" aria-label="Tracing options and preview">
+			<section bind:this={optionsSection} class="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500" aria-label="Tracing options and preview">
 				<div class="space-y-6">
 					<div>
 						<h2 class="text-lg font-semibold border-b border-gray-100 pb-2 mb-4">Original Image</h2>
@@ -424,7 +437,7 @@
 
 			{#if originalSvg}
 			<!-- Unified Result Viewer -->
-			<section class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500" aria-label="Result Viewer">
+			<section bind:this={resultSection} class="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500" aria-label="Result Viewer">
 				
 				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
 					<div>
